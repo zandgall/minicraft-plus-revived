@@ -4,27 +4,27 @@ import minicraft.core.CrashHandler;
 import minicraft.util.Logging;
 import org.jetbrains.annotations.Nullable;
 
-import javax.sound.sampled.AudioFormat;
-import javax.sound.sampled.AudioSystem;
-import javax.sound.sampled.Clip;
-import javax.sound.sampled.DataLine;
-import javax.sound.sampled.Line;
-import javax.sound.sampled.LineEvent;
-import javax.sound.sampled.LineUnavailableException;
-import javax.sound.sampled.UnsupportedAudioFileException;
+import com.jogamp.openal.*;
+import com.jogamp.openal.util.*;
 
-import java.io.IOException;
 import java.io.InputStream;
+import java.nio.ByteBuffer;
 import java.util.HashMap;
 
 public class Sound {
 	// Creates sounds from their respective files
 	private static final HashMap<String, Sound> sounds = new HashMap<>();
 
-	private Clip clip; // Creates a audio clip to be played
+	private static final AL al = ALFactory.getAL();
+	private final int source;
 
-	private Sound(Clip clip) {
-		this.clip = clip;
+	static {
+		ALut.alutInit();
+		al.alGetError();
+	}
+
+	private Sound(int source) {
+		this.source = source;
 	}
 
 	public static void resetSounds() {
@@ -32,57 +32,25 @@ public class Sound {
 	}
 
 	public static void loadSound(String key, InputStream in, String pack) {
-		try {
-			DataLine.Info info = new DataLine.Info(Clip.class, AudioSystem.getAudioFileFormat(in).getFormat());
+		int[] buffer = new int[1];
+		int[] source = new int[1];
 
-			if (!AudioSystem.isLineSupported(info)) {
-				Logging.RESOURCEHANDLER_SOUND.error("ERROR: Audio format of file \"{}\" in pack \"\" is not supported: {}", key, pack, AudioSystem.getAudioFileFormat(in));
+		int[] format = new int[1];
+		int[] size = new int[1];
+		ByteBuffer[] data = new ByteBuffer[1];
+		int[] freq = new int[1];
+		int[] loop = new int[1];
+		al.alGenBuffers(1, buffer, 0);
+		ALut.alutLoadWAVFile(in, format, data, size, freq, loop);
+		al.alBufferData(buffer[0], format[0], data[0], size[0], freq[0]);
 
-				Logging.RESOURCEHANDLER_SOUND.error("Supported audio formats:");
-				Logging.RESOURCEHANDLER_SOUND.error("-source:");
-				Line.Info[] sinfo = AudioSystem.getSourceLineInfo(info);
-				Line.Info[] tinfo = AudioSystem.getTargetLineInfo(info);
-				for (Line.Info value : sinfo) {
-					if (value instanceof DataLine.Info) {
-						DataLine.Info dataLineInfo = (DataLine.Info) value;
-						AudioFormat[] supportedFormats = dataLineInfo.getFormats();
-						for (AudioFormat af : supportedFormats)
-							Logging.RESOURCEHANDLER_SOUND.error(af);
-					}
-				}
-				Logging.RESOURCEHANDLER_SOUND.error("-target:");
-				for (int i = 0; i < tinfo.length; i++) {
-					if (tinfo[i] instanceof DataLine.Info) {
-						DataLine.Info dataLineInfo = (DataLine.Info) tinfo[i];
-						AudioFormat[] supportedFormats = dataLineInfo.getFormats();
-						for (AudioFormat af : supportedFormats)
-							Logging.RESOURCEHANDLER_SOUND.error(af);
-					}
-				}
-
-				return;
-			}
-
-			Clip clip = (Clip) AudioSystem.getLine(info);
-			clip.open(AudioSystem.getAudioInputStream(in));
-
-			clip.addLineListener(e -> {
-				if (e.getType() == LineEvent.Type.STOP) {
-					clip.flush();
-					clip.setFramePosition(0);
-				}
-			});
-
-			sounds.put(key, new Sound(clip));
-
-		} catch (LineUnavailableException | UnsupportedAudioFileException | IOException e) {
-			CrashHandler.errorHandle(e, new CrashHandler.ErrorInfo("Audio Could not Load", CrashHandler.ErrorInfo.ErrorType.REPORT,
-				String.format("Could not load audio: %s in pack: %s", key, pack)));
-		}
+		al.alGenSources(1, source, 0);
+		al.alSourcei(source[0], AL.AL_BUFFER, buffer[0]);
+		sounds.put(key, new Sound(source[0]));
 	}
 
 	/**
-	 * Recommend {@link #play(String)} and {@link #loop(String, boolean)}.
+	 * Recommend {@link #play(String)}.
 	 */
 	@Nullable
 	public static Sound getSound(String key) {
@@ -97,29 +65,23 @@ public class Sound {
 		if (sound != null) sound.play();
 	}
 
-	/**
-	 * This method does safe check for {@link #loop(boolean)}.
-	 */
-	public static void loop(String key, boolean start) {
-		Sound sound = sounds.get(key);
-		if (sound != null) sound.loop(start);
-	}
+	// Need separate way to detect how many loops a sound has made before we can implement loo
+
+	///**
+	// * This method does safe check for {@link #loop(boolean)}.
+	// */
+//	public static void loop(String key, boolean start) {
+//		Sound sound = sounds.get(key);
+//		if (sound != null) sound.loop(count);
+//	}
 
 	public void play() {
-		if (!(boolean) Settings.get("sound") || clip == null) return;
-
-		if (clip.isRunning() || clip.isActive())
-			clip.stop();
-
-		clip.start();
+		if (!(boolean) Settings.get("sound")) return;
+		al.alSourcePlay(source);
 	}
 
-	public void loop(boolean start) {
-		if (!(boolean) Settings.get("sound") || clip == null) return;
-
-		if (start)
-			clip.loop(Clip.LOOP_CONTINUOUSLY);
-		else
-			clip.stop();
-	}
+	// Need separate way to detect how many loops a sound has made
+//	public void loop(int count) {
+//		if (!(boolean) Settings.get("sound")) return;
+//	}
 }
