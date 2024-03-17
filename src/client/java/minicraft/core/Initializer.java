@@ -1,10 +1,26 @@
 package minicraft.core;
 
+import com.jogamp.common.nio.Buffers;
+import com.jogamp.newt.event.KeyEvent;
+import com.jogamp.newt.event.KeyListener;
+import com.jogamp.newt.event.WindowAdapter;
+import com.jogamp.newt.opengl.GLWindow;
+import com.jogamp.opengl.GL4;
+import com.jogamp.opengl.GLAutoDrawable;
+import com.jogamp.opengl.GLCapabilities;
+import com.jogamp.opengl.GLContext;
+import com.jogamp.opengl.GLDebugListener;
+import com.jogamp.opengl.GLDebugMessage;
+import com.jogamp.opengl.GLEventListener;
+import com.jogamp.opengl.GLProfile;
+import com.jogamp.opengl.util.Animator;
+import com.jogamp.opengl.util.GLBuffers;
 import minicraft.core.io.FileHandler;
 import minicraft.core.io.Localization;
 import minicraft.util.Logging;
 import minicraft.util.TinylogLoggingProvider;
 import org.jetbrains.annotations.Nullable;
+import org.joml.Matrix4f;
 import org.tinylog.provider.ProviderRegistry;
 
 import javax.imageio.ImageIO;
@@ -19,6 +35,14 @@ import java.awt.event.WindowEvent;
 import java.awt.event.WindowListener;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
+import java.nio.Buffer;
+import java.nio.FloatBuffer;
+import java.nio.IntBuffer;
+import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
+
+import static com.jogamp.opengl.GL3.*;
+import static com.jogamp.opengl.GL4.*;
 
 public class Initializer extends Game {
 	private Initializer() {
@@ -28,6 +52,11 @@ public class Initializer extends Game {
 	 * Reference to actual frame, also it may be null.
 	 */
 	static JFrame frame;
+	private static GLWindow window;
+	private static Animator animator;
+	private static GLListener glListener;
+	private static GLDebugger glDebugger;
+	static int vao, vbo, ebo, shader;
 	static int fra, tik; // These store the number of frames and ticks in the previous second; used for fps, at least.
 
 	public static JFrame getFrame() {
@@ -131,9 +160,35 @@ public class Initializer extends Game {
 		}
 	}
 
-
 	// Creates and displays the JFrame window that the game appears in.
 	static void createAndDisplayFrame() {
+		GLProfile profile = GLProfile.get(GLProfile.GL4);
+		GLCapabilities capabilities = new GLCapabilities(profile);
+
+		window = GLWindow.create(capabilities);
+
+		window.setTitle(NAME);
+		window.setSize(Renderer.getWindowSize().width, Renderer.getWindowSize().height);
+
+		glListener = new GLListener();
+		glDebugger = new GLDebugger();
+		window.addGLEventListener(glListener);
+		window.addKeyListener(glListener);
+
+		window.setContextCreationFlags(GLContext.CTX_OPTION_DEBUG);
+
+		if(window == null) {
+			System.out.println("Well fuck");
+		}
+
+		window.addWindowListener(new WindowAdapter() {
+			@Override
+			public void windowDestroyed(com.jogamp.newt.event.WindowEvent windowEvent) {
+				animator.stop();
+				running = false;
+			}
+		});
+
 		Renderer.canvas.setMinimumSize(new java.awt.Dimension(1, 1));
 		Renderer.canvas.setPreferredSize(Renderer.getWindowSize());
 		Renderer.canvas.setBackground(Color.BLACK);
@@ -194,6 +249,10 @@ public class Initializer extends Game {
 		frame.setVisible(true);
 		frame.requestFocus();
 		Renderer.canvas.requestFocus();
+
+		window.setVisible(true);
+		animator = new Animator(window);
+		animator.start();
 	}
 
 	/**
@@ -215,5 +274,214 @@ public class Initializer extends Game {
 			exceptionStr = "Unavailable";
 		}
 		return exceptionStr;
+	}
+
+	static class GLListener implements GLEventListener, KeyListener {
+
+		@Override
+		public void init(GLAutoDrawable glAutoDrawable) {
+			// Invalid operation somewhere in here
+			GL4 gl = glAutoDrawable.getGL().getGL4();
+
+			window.getContext().addGLDebugListener(glDebugger);
+			gl.glDebugMessageControl(
+				GL_DONT_CARE,
+				GL_DONT_CARE,
+				GL_DONT_CARE,
+				0,
+				null,
+				false);
+
+			gl.glDebugMessageControl(
+				GL_DONT_CARE,
+				GL_DONT_CARE,
+				GL_DEBUG_SEVERITY_HIGH,
+				0,
+				null,
+				true);
+
+			gl.glDebugMessageControl(
+				GL_DONT_CARE,
+				GL_DONT_CARE,
+				GL_DEBUG_SEVERITY_MEDIUM,
+				0,
+				null,
+				true);
+
+			int ERR = gl.glGetError();
+
+			// Square VAO definitions
+			FloatBuffer vertices = GLBuffers.newDirectFloatBuffer(new float[] {
+				1.0f,  1.0f, 0.0f, 1, 1, 1, 0, 0, -1, // top right
+				1.0f, -1.0f, 0.0f, 1, 1, 0, 0, 0, -1, // bottom right
+				-1.0f, -1.0f, 0.0f, 1, 0, 0, 0, 0, -1, // bottom left
+				-1.0f,  1.0f, 0.0f, 1, 0, 1, 0, 0, -1  // top left
+			});
+			IntBuffer indices = GLBuffers.newDirectIntBuffer(new int[]{
+				0, 1, 3,   // first triangle
+				1, 2, 3    // second triangle
+			});
+
+			IntBuffer buff = GLBuffers.newDirectIntBuffer(new int[] {vao});
+			vao = -1;
+			gl.glGenVertexArrays(1, buff);
+			vao = buff.get(0);
+			gl.glBindVertexArray(vao);
+
+			ERR = gl.glGetError();
+
+			vbo = -1;
+			ebo = -1;
+			buff = GLBuffers.newDirectIntBuffer(new int[] {vbo, ebo});
+			gl.glGenBuffers(2, buff);
+			vbo = buff.get(0);
+			ebo = buff.get(1);
+
+			gl.glBindBuffer(GL_ARRAY_BUFFER, vbo);
+			gl.glBufferStorage(GL_ARRAY_BUFFER, vertices.capacity()*Float.BYTES, vertices, 0);
+			gl.glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
+			gl.glBufferStorage(GL_ELEMENT_ARRAY_BUFFER, indices.capacity()*Integer.BYTES, indices, 0);
+
+			ERR = gl.glGetError();
+
+			gl.glEnableVertexAttribArray(0);
+			gl.glVertexAttribPointer(0, 4, GL_FLOAT, false, 9*Float.BYTES, 0);
+			gl.glEnableVertexAttribArray(1);
+			gl.glVertexAttribPointer(1, 2, GL_FLOAT, false, 9*Float.BYTES, 4*Float.BYTES);
+			gl.glEnableVertexAttribArray(2);
+			gl.glVertexAttribPointer(2, 3, GL_FLOAT, false, 9*Float.BYTES, 6*Float.BYTES);
+
+			ERR = gl.glGetError();
+
+			shader = gl.glCreateProgram();
+			ERR = gl.glGetError();
+			int vs = gl.glCreateShader(GL_VERTEX_SHADER);
+			ERR = gl.glGetError();
+			gl.glShaderSource(vs, 1, new String[] {"""
+#version 330
+in vec4 in_position;
+in vec2 in_uv;
+in vec3 in_normal;
+
+out vec2 uv;
+uniform mat4 screenspace, transform;
+
+void main() {
+	gl_Position = screenspace * transform * in_position;
+	//	gl_Position.w = 1;
+	//	gl_Position.z = 0;
+	uv = in_uv;
+}"""}, null);
+			gl.glCompileShader(vs);
+			ERR = gl.glGetError();
+			int[] result = new int[] {0};
+			gl.glGetShaderiv(vs, GL_COMPILE_STATUS, result, 0);
+			ERR = gl.glGetError();
+			if(result[0] == GL_FALSE) {
+				gl.glGetShaderiv(vs, GL_INFO_LOG_LENGTH, result, 0);
+				byte[] message = new byte[result[0]];
+				gl.glGetShaderInfoLog(vs, result[0], result, 0, message, 0);
+				System.out.println(new String(message, StandardCharsets.UTF_8));
+				gl.glDeleteShader(vs);
+			}
+			ERR = gl.glGetError();
+			int fs = gl.glCreateShader(GL_FRAGMENT_SHADER);
+			gl.glShaderSource(fs, 1, new String[] {"""
+#version 330
+in vec2 uv;
+uniform sampler2D texture;
+out vec4 out_color;
+void main() {
+	out_color = texture2D(texture, uv);
+}"""}, null);
+			gl.glCompileShader(fs);
+			ERR = gl.glGetError();
+			gl.glGetShaderiv(fs, GL_COMPILE_STATUS, result, 0);
+			ERR = gl.glGetError();
+			if(result[0] == GL_FALSE) {
+				gl.glGetShaderiv(fs, GL_INFO_LOG_LENGTH, result, 0);
+				byte[] message = new byte[result[0]];
+				gl.glGetShaderInfoLog(fs, result[0], result, 0, message, 0);
+				System.out.println(Arrays.toString(message));
+				gl.glDeleteShader(fs);
+			}
+			ERR = gl.glGetError();
+			gl.glAttachShader(shader, vs);
+			gl.glAttachShader(shader, fs);
+			gl.glLinkProgram(shader);
+			gl.glValidateProgram(shader);
+			ERR = gl.glGetError();
+
+			gl.glDeleteShader(vs);
+			gl.glDeleteShader(fs);
+			ERR = gl.glGetError();
+		}
+
+		@Override
+		public void dispose(GLAutoDrawable glAutoDrawable) {
+
+		}
+
+		@Override
+		public void display(GLAutoDrawable glAutoDrawable) {
+			GL4 gl = glAutoDrawable.getGL().getGL4();
+
+			int w = glAutoDrawable.getSurfaceWidth();
+			int h = glAutoDrawable.getSurfaceHeight();
+			gl.glViewport(0, 0, w, h);
+			gl.glClearColor(0.5f, 0.8f, 1.0f, 1.0f);
+			gl.glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+			gl.glDisable(GL_DEPTH_TEST);
+			int ERR = gl.glGetError();
+
+			gl.glUseProgram(shader);
+			ERR = gl.glGetError();
+
+			FloatBuffer buff = Buffers.newDirectFloatBuffer(16);
+			new Matrix4f().ortho(0, w, h, 0, -1, 1).get(buff);
+			for(int m = 0; m < 16; m++ ) {
+				float f = buff.get(m);
+				System.nanoTime();
+			}
+			int i = gl.glGetUniformLocation(shader, "screenspace");
+			gl.glUniformMatrix4fv(i, 1, false, buff);
+			ERR = gl.glGetError();
+			new Matrix4f().identity().get(buff);
+			for(int m = 0; m < 16; m++ ) {
+				float f = buff.get(m);
+				System.nanoTime();
+			}
+			i = gl.glGetUniformLocation(shader, "transform");
+			ERR = gl.glGetError();
+			gl.glUniformMatrix4fv(i, 1, false, buff);
+			ERR = gl.glGetError();
+			gl.glBindVertexArray(vao);
+			ERR = gl.glGetError();
+			gl.glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+			ERR = gl.glGetError();
+		}
+
+		@Override
+		public void reshape(GLAutoDrawable glAutoDrawable, int i, int i1, int i2, int i3) {
+
+		}
+
+		@Override
+		public void keyPressed(KeyEvent keyEvent) {
+
+		}
+
+		@Override
+		public void keyReleased(KeyEvent keyEvent) {
+
+		}
+	}
+
+	static class GLDebugger implements GLDebugListener {
+
+		@Override
+		public void messageSent(GLDebugMessage glDebugMessage) {
+
+		}
 	}
 }
