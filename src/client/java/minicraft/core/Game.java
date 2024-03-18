@@ -34,6 +34,11 @@ public class Game {
 
 	public static int MAX_FPS;
 
+	static boolean focused;
+	public static boolean isFocused() {
+		return focused;
+	}
+
 	// DISPLAY
 	static Display currentDisplay = null;
 	static final ArrayDeque<Display> displayQuery = new ArrayDeque<>();
@@ -100,7 +105,7 @@ public class Game {
 
 		Analytics.GameStartup.ping();
 
-		input = new InputHandler(Renderer.canvas);
+		input = new InputHandler();
 
 		ResourcePackDisplay.initPacks();
 		ResourcePackDisplay.reloadResources();
