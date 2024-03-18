@@ -180,10 +180,10 @@ public class Updater extends Game {
 		if (updateNoteTick) notetick++;
 
 		// This is the general action statement thing! Regulates menus, mostly.
-		if (!Renderer.canvas.hasFocus()) {
+		if (!Game.isFocused()) {
 			input.releaseAll();
 		}
-		if (Renderer.canvas.hasFocus()) {
+		if (Game.isFocused()) {
 			gameTime++;
 
 			input.tick(); // INPUT TICK; no other class should call this, I think...especially the *Menu classes.

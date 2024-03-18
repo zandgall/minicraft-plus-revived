@@ -8,6 +8,9 @@ import com.studiohartman.jamepad.ControllerManager;
 import com.studiohartman.jamepad.ControllerUnpluggedException;
 import minicraft.util.Logging;
 import org.jetbrains.annotations.Nullable;
+import org.lwjgl.glfw.GLFW;
+import org.lwjgl.glfw.GLFWCharCallback;
+import org.lwjgl.glfw.GLFWKeyCallback;
 import org.tinylog.Logger;
 
 import java.awt.Component;
@@ -23,7 +26,9 @@ import java.util.Map.Entry;
 import java.util.Stack;
 import java.util.function.Predicate;
 
-public class InputHandler implements KeyListener {
+import static org.lwjgl.glfw.GLFW.*;
+
+public class InputHandler {
 	/**
 	 * This class handles key presses; this also implements MouseListener... but I have no idea why.
 	 * It's not used in any way. Ever. As far as I know. Anyway, here are a few tips about this class:
@@ -67,25 +72,25 @@ public class InputHandler implements KeyListener {
 	private static HashMap<Integer, String> keyNames = new HashMap<>();
 
 	static {
-		Field[] keyEventFields = KeyEvent.class.getFields();
+		Field[] keyEventFields = org.lwjgl.glfw.GLFW.class.getFields();
 		ArrayList<Field> keyConstants = new ArrayList<>();
 		for (Field field : keyEventFields) {
-			if (field.getName().contains("VK_") && (field.getType().getName().equals(int.class.getName())))
+			if (field.getName().contains("GLFW_KEY_") && (field.getType().getName().equals(int.class.getName())))
 				keyConstants.add(field);
 		}
 
 		for (Field keyConst : keyConstants) {
 			String name = keyConst.getName();
-			name = name.substring(3); // Removes the "VK_"
+			name = name.substring(9); // Removes the "VK_"
 			try {
-				keyNames.put(((Integer) keyConst.get(0)), name);
+				keyNames.put((Integer)keyConst.get(0), name);
 			} catch (IllegalAccessException ignored) {
 			}
 		}
 
 		// For compatibility becuase I'm lazy. :P
-		keyNames.put(KeyEvent.VK_BACK_SPACE, "BACKSPACE");
-		keyNames.put(KeyEvent.VK_CONTROL, "CTRL");
+//		keyNames.put(KeyEvent.VK_BACK_SPACE, "BACKSPACE");
+//		keyNames.put(KeyEvent.VK_CONTROL, "CTRL");
 	}
 
 	private HashMap<String, String> keymap; // The symbolic map of actions to physical key names.
@@ -127,11 +132,6 @@ public class InputHandler implements KeyListener {
 			Logging.CONTROLLER.error(e, "Controllers are not support, being disabled.");
 		}
 		controllersSupported = controllerInit;
-	}
-
-	public InputHandler(Component inputSource) {
-		this();
-//		inputSource.addKeyListener(this); // Add key listener to game
 	}
 
 	private void initKeyMap() {
@@ -553,7 +553,7 @@ public class InputHandler implements KeyListener {
 		String keytext;
 
 		if (keyNames.containsKey(keycode))
-			keytext = keyNames.get(keycode);
+			keytext = keyNames.get(keycode); 
 		else {
 			Logger.tag("INPUT").error("Could not find keyname for keycode \"" + keycode + "\"");
 			return;
@@ -652,6 +652,16 @@ public class InputHandler implements KeyListener {
 	public void keyTyped(KeyEvent ke) {
 		// Stores the last character typed
 		keyTypedBuffer = String.valueOf(ke.getKeyChar());
+	}
+
+	// Key pressed or released
+	public void glfwKeyCallback(long window, int key, int scancode, int action, int mods) {
+		toggle(scancode, action==GLFW_PRESS);
+	}
+
+	// Char typed
+	public void glfwCharCallback(long l, int key) {
+		keyTypedBuffer = String.valueOf((char)key);
 	}
 
 	private static final String control = "\\p{Print}"; // Should match only printable characters.
