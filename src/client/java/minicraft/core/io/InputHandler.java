@@ -131,7 +131,7 @@ public class InputHandler implements KeyListener {
 
 	public InputHandler(Component inputSource) {
 		this();
-		inputSource.addKeyListener(this); // Add key listener to game
+//		inputSource.addKeyListener(this); // Add key listener to game
 	}
 
 	private void initKeyMap() {

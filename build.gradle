@@ -8,7 +8,7 @@ allprojects {
 
     version = "2.2.0-dev6"
 
-    sourceCompatibility = 8
+    sourceCompatibility = 17
     [compileJava, compileTestJava]*.options*.encoding = 'UTF-8'
 
     repositories {
@@ -47,6 +47,8 @@ project(":client") {
         maven { url "https://jitpack.io" }
     }
 
+    project.ext.lwjglNatives = "natives-linux"
+
     dependencies {
         implementation project(":common")
 
@@ -56,6 +58,24 @@ project(":client") {
         implementation 'com.badlogicgames.gdx:gdx-box2d:1.11.0'
         implementation 'com.badlogicgames.gdx:gdx-controllers:1.9.13'
         implementation 'com.badlogicgames.jamepad:jamepad:2.0.20.0'
+
+        implementation platform("org.lwjgl:lwjgl-bom:3.2.3")
+
+        implementation "org.joml:joml:1.10.5"
+        implementation "org.lwjgl:lwjgl"
+        implementation "org.lwjgl:lwjgl-assimp"
+        implementation "org.lwjgl:lwjgl-glfw"
+        implementation "org.lwjgl:lwjgl-openal"
+        implementation "org.lwjgl:lwjgl-opengl"
+        implementation "org.lwjgl:lwjgl-stb"
+        runtimeOnly "org.lwjgl:lwjgl::$lwjglNatives"
+        runtimeOnly "org.lwjgl:lwjgl-assimp::$lwjglNatives"
+        runtimeOnly "org.lwjgl:lwjgl-glfw::$lwjglNatives"
+        runtimeOnly "org.lwjgl:lwjgl-openal::$lwjglNatives"
+        runtimeOnly "org.lwjgl:lwjgl-opengl::$lwjglNatives"
+        runtimeOnly "org.lwjgl:lwjgl-stb::$lwjglNatives"
+
+
     }
 
     application {

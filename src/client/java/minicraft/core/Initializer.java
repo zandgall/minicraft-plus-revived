@@ -7,9 +7,16 @@ import minicraft.util.TinylogLoggingProvider;
 import org.jetbrains.annotations.Nullable;
 import org.tinylog.provider.ProviderRegistry;
 
+import org.lwjgl.*;
+import org.lwjgl.glfw.*;
+import org.lwjgl.opengl.*;
+import org.lwjgl.system.*;
+
 import javax.imageio.ImageIO;
 import javax.swing.JFrame;
 import javax.swing.WindowConstants;
+
+import java.nio.*;
 
 import java.awt.BorderLayout;
 import java.awt.Color;
@@ -19,10 +26,26 @@ import java.awt.event.WindowEvent;
 import java.awt.event.WindowListener;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+
+import static org.lwjgl.glfw.Callbacks.*;
+import static org.lwjgl.glfw.GLFW.*;
+import static org.lwjgl.opengl.GL11.*;
+import static org.lwjgl.opengl.GL15.*;
+import static org.lwjgl.opengl.GL20.*;
+import static org.lwjgl.opengl.GL30.*;
+import static org.lwjgl.system.MemoryStack.*;
+import static org.lwjgl.system.MemoryUtil.*;
 
 public class Initializer extends Game {
 	private Initializer() {
 	}
+
+	/**
+	 * LWJGL/GLFW Stuff
+	 */
+	private static long window;
+	private static int vao, shader;
 
 	/**
 	 * Reference to actual frame, also it may be null.
@@ -88,7 +111,10 @@ public class Initializer extends Game {
 		int ticks = 0;
 		long lastTimer1 = System.currentTimeMillis();
 
-		while (running) {
+		GL.createCapabilities();
+		glClearColor(1.0f, 0.0f, 0.0f, 0.0f);
+
+		while (!glfwWindowShouldClose(window)) {
 			long now = System.nanoTime();
 			double nsPerTick = 1E9D / Updater.normSpeed; // Nanosecs per sec divided by ticks per sec = nanosecs per tick
 			if (currentDisplay == null) nsPerTick /= Updater.gamespeed;
@@ -96,7 +122,7 @@ public class Initializer extends Game {
 			lastTick = now;
 			while (unprocessed >= 1) { // If there is unprocessed time, then tick.
 				ticks++;
-				Updater.tick(); // Calls the tick method (in which it calls the other tick methods throughout the code.
+//				Updater.tick(); // Calls the tick method (in which it calls the other tick methods throughout the code.
 				unprocessed--;
 			}
 
@@ -128,72 +154,197 @@ public class Initializer extends Game {
 				frames = 0; // Resets frames
 				ticks = 0; // Resets ticks; ie, frames and ticks only are per second
 			}
+
+			glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+			glfwSwapBuffers(window);
+			glfwPollEvents();
 		}
+
+		glfwFreeCallbacks(window);
+		glfwDestroyWindow(window);
+		glfwTerminate();
+		glfwSetErrorCallback(null).free();
 	}
 
+	static void init() {
+		GLFWErrorCallback.createPrint(System.err).set();
+		if(!glfwInit())
+			Logging.GAMEHANDLER.error("Could not initialize GLFW", new IllegalStateException("Unable to initialize GLFW"));
+
+		glfwDefaultWindowHints();
+		glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
+		glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 6);
+		glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
+		glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE);
+
+		window = glfwCreateWindow(Renderer.getWindowSize().width, Renderer.getWindowSize().height, NAME, NULL, NULL);
+		if(window == NULL)
+			Logging.GAMEHANDLER.error("Could not create window", new RuntimeException("Unable to create window"));
+
+		glfwSetKeyCallback(window, (window, key, scancode, action, mods) -> {
+			// Handle keys
+		});
+
+		try (MemoryStack stack = stackPush()) {
+			IntBuffer pWidth = stack.mallocInt(1);
+			IntBuffer pHeight = stack.mallocInt(1);
+			glfwGetWindowSize(window, pWidth, pHeight);
+			GLFWVidMode vidmode = glfwGetVideoMode(glfwGetPrimaryMonitor());
+			glfwSetWindowPos(window, (vidmode.width() - pWidth.get(0))/2, (vidmode.height() - pHeight.get(0))/2);
+		}
+
+		glfwMakeContextCurrent(window);
+
+		glfwSwapInterval(1);
+
+		vao = glGenVertexArrays();
+		glBindVertexArray(vao);
+
+		int vbo = glGenBuffers();
+		glBindBuffer(GL_ARRAY_BUFFER, vbo);
+		glBufferData(GL_ARRAY_BUFFER, new float[] {
+			1.0f, 1.0f, 0.0f, 1, 1, 1, 0, 0, -1, // top right
+			1.0f, -1.0f, 0.0f, 1, 1, 0, 0, 0, -1, // bottom right
+			-1.0f, -1.0f, 0.0f, 1, 0, 0, 0, 0, -1, // bottom left
+			-1.0f,  1.0f, 0.0f, 1, 0, 1, 0, 0, -1  // top left
+		}, GL_STATIC_DRAW);
+		int ebo = glGenBuffers();
+		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
+		glBufferData(GL_ELEMENT_ARRAY_BUFFER, new int[] {
+			0, 1, 3, 1, 2, 3
+		}, GL_STATIC_DRAW);
+
+		glEnableVertexAttribArray(0);
+		glVertexAttribPointer(0, 4, GL_FLOAT, false, 9*Float.BYTES, 0);
+		glEnableVertexAttribArray(1);
+		glVertexAttribPointer(1, 2, GL_FLOAT, false, 9*Float.BYTES, 4);
+		glEnableVertexAttribArray(2);
+		glVertexAttribPointer(2, 3, GL_FLOAT, false, 9*Float.BYTES, 6);
+
+		shader = glCreateProgram();
+		int vs = glCreateShader(GL_VERTEX_SHADER);
+		glShaderSource(vs, """
+#version 330 core
+
+in vec4 in_position;
+in vec2 in_uv;
+in vec3 in_normal;
+
+// Only using UV
+out vec2 uv;
+
+uniform mat4 screenspace, transform;
+
+void main() {
+	gl_Position = screenspace * transform * in_position;
+	uv = in_uv;
+}""");
+		glCompileShader(vs);
+		int[] result = new int[]{0};
+		glGetShaderiv(vs, GL_COMPILE_STATUS, result);
+		if(result[0] == GL_FALSE) {
+			glGetShaderiv(vs, GL_INFO_LOG_LENGTH, result);
+			ByteBuffer log = ByteBuffer.allocate(result[0]);
+			glGetShaderInfoLog(vs, result, log);
+			System.out.println(new String(log.array(), StandardCharsets.UTF_8));
+			glDeleteShader(vs);
+		}
+		int fs = glCreateShader(GL_FRAGMENT_SHADER);
+		glShaderSource(fs, """
+#version 330 core
+
+in vec2 uv;
+
+uniform sampler2D texture;
+
+out vec4 out_color;
+
+void main() {
+	out_color = texture2D(texture, uv);
+}""");
+		glCompileShader(fs);
+		glGetShaderiv(fs, GL_COMPILE_STATUS, result);
+		if(result[0] == GL_FALSE) {
+			glGetShaderiv(fs, GL_INFO_LOG_LENGTH, result);
+			ByteBuffer log = ByteBuffer.allocate(result[0]);
+			glGetShaderInfoLog(fs, result, log);
+			System.out.println(new String(log.array(), StandardCharsets.UTF_8));
+			glDeleteShader(fs);
+		}
+
+		glAttachShader(shader, vs);
+		glAttachShader(shader, fs);
+		glLinkProgram(shader);
+		glValidateProgram(shader);
+
+		glDeleteShader(vs);
+		glDeleteShader(fs);
+
+		glfwShowWindow(window);
+	}
 
 	// Creates and displays the JFrame window that the game appears in.
 	static void createAndDisplayFrame() {
-		Renderer.canvas.setMinimumSize(new java.awt.Dimension(1, 1));
-		Renderer.canvas.setPreferredSize(Renderer.getWindowSize());
-		Renderer.canvas.setBackground(Color.BLACK);
-		JFrame frame = Initializer.frame = new JFrame(NAME);
-		frame.setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
-		frame.setLayout(new BorderLayout()); // Sets the layout of the window
-		frame.add(Renderer.canvas, BorderLayout.CENTER); // Adds the game (which is a canvas) to the center of the screen.
-		frame.pack(); // Squishes everything into the preferredSize.
+//		Renderer.canvas.setMinimumSize(new java.awt.Dimension(1, 1));
+//		Renderer.canvas.setPreferredSize(Renderer.getWindowSize());
+//		Renderer.canvas.setBackground(Color.BLACK);
+//		JFrame frame = Initializer.frame = new JFrame(NAME);
+//		frame.setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
+//		frame.setLayout(new BorderLayout()); // Sets the layout of the window
+//		frame.add(Renderer.canvas, BorderLayout.CENTER); // Adds the game (which is a canvas) to the center of the screen.
+//		frame.pack(); // Squishes everything into the preferredSize.
 
-		try {
-			BufferedImage logo = ImageIO.read(Game.class.getResourceAsStream("/resources/logo.png")); // Load the window logo
-			frame.setIconImage(logo);
-		} catch (IOException e) {
-			CrashHandler.errorHandle(e);
-		}
+//		try {
+//			BufferedImage logo = ImageIO.read(Game.class.getResourceAsStream("/resources/logo.png")); // Load the window logo
+//			frame.setIconImage(logo);
+//		} catch (IOException e) {
+//			CrashHandler.errorHandle(e);
+//		}
 
-		frame.setLocationRelativeTo(null); // The window will pop up in the middle of the screen when launched.
+//		frame.setLocationRelativeTo(null); // The window will pop up in the middle of the screen when launched.
 
-		frame.addComponentListener(new ComponentAdapter() {
-			public void componentResized(ComponentEvent e) {
-				float w = frame.getWidth() - frame.getInsets().left - frame.getInsets().right;
-				float h = frame.getHeight() - frame.getInsets().top - frame.getInsets().bottom;
-				Renderer.SCALE = Math.min(w / Renderer.WIDTH, h / Renderer.HEIGHT);
-			}
-		});
+//		frame.addComponentListener(new ComponentAdapter() {
+//			public void componentResized(ComponentEvent e) {
+//				float w = frame.getWidth() - frame.getInsets().left - frame.getInsets().right;
+//				float h = frame.getHeight() - frame.getInsets().top - frame.getInsets().bottom;
+//				Renderer.SCALE = Math.min(w / Renderer.WIDTH, h / Renderer.HEIGHT);
+//			}
+//		});
 
-		frame.addWindowListener(new WindowListener() {
-			public void windowActivated(WindowEvent e) {
-			}
-
-			public void windowDeactivated(WindowEvent e) {
-			}
-
-			public void windowIconified(WindowEvent e) {
-			}
-
-			public void windowDeiconified(WindowEvent e) {
-			}
-
-			public void windowOpened(WindowEvent e) {
-			}
-
-			public void windowClosed(WindowEvent e) {
-				Logging.GAMEHANDLER.debug("Window closed");
-			}
-
-			public void windowClosing(WindowEvent e) {
-				Logging.GAMEHANDLER.info("Window closing");
-				quit();
-			}
-		});
+//		frame.addWindowListener(new WindowListener() {
+//			public void windowActivated(WindowEvent e) {
+//			}
+//
+//			public void windowDeactivated(WindowEvent e) {
+//			}
+//
+//			public void windowIconified(WindowEvent e) {
+//			}
+//
+//			public void windowDeiconified(WindowEvent e) {
+//			}
+//
+//			public void windowOpened(WindowEvent e) {
+//			}
+//
+//			public void windowClosed(WindowEvent e) {
+//				Logging.GAMEHANDLER.debug("Window closed");
+//			}
+//
+//			public void windowClosing(WindowEvent e) {
+//				Logging.GAMEHANDLER.info("Window closing");
+//				quit();
+//			}
+//		});
 	}
 
 	/**
 	 * Launching the main window.
 	 */
 	static void launchWindow() {
-		frame.setVisible(true);
-		frame.requestFocus();
-		Renderer.canvas.requestFocus();
+//		frame.setVisible(true);
+//		frame.requestFocus();
+//		Renderer.canvas.requestFocus();
 	}
 
 	/**

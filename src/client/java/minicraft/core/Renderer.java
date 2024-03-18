@@ -65,7 +65,8 @@ public class Renderer extends Game {
 	public static Screen screen; // Creates the main screen
 	public static SpriteLinker spriteLinker = new SpriteLinker(); // The sprite linker for sprites
 
-	static Canvas canvas = new Canvas();
+//	static Canvas canvas = new Canvas();
+	static Canvas canvas = null;
 	private static BufferedImage image; // Creates an image to be displayed on the screen.
 
 	private static Screen lightScreen; // Creates a front screen to render the darkness in caves (Fog of war).
@@ -105,7 +106,7 @@ public class Renderer extends Game {
 		screen.pixels = ((DataBufferInt) image.getRaster().getDataBuffer()).getData();
 		hudSheet = new LinkedSprite(SpriteType.Gui, "hud");
 
-		canvas.createBufferStrategy(3);
+//		canvas.createBufferStrategy(3);
 	}
 
 
@@ -114,6 +115,7 @@ public class Renderer extends Game {
 	 */
 	public static void render() {
 		if (screen == null) return; // No point in this if there's no gui... :P
+		if (canvas == null) return;
 
 		if (readyToRenderGameplay) {
 			renderLevel();
