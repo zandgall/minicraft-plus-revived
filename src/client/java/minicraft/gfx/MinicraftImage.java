@@ -2,9 +2,13 @@ package minicraft.gfx;
 
 import minicraft.core.CrashHandler;
 import minicraft.gfx.SpriteLinker.LinkedSprite;
+import org.lwjgl.BufferUtils;
 
 import java.awt.image.BufferedImage;
 import java.io.IOException;
+import java.nio.ByteBuffer;
+
+import static org.lwjgl.opengl.GL30.*;
 
 /**
  * Although we have SpriteLinker, we still need SpriteSheet for buffering.
@@ -18,6 +22,7 @@ public class MinicraftImage {
 
 	public final int width, height; // Width and height of the sprite sheet
 	public final int[] pixels; // Integer array of the image's pixels
+	public final int texture;
 
 	/**
 	 * Default with maximum size of image.
@@ -61,6 +66,8 @@ public class MinicraftImage {
 
 		pixels = image.getRGB(0, 0, width, height, null, 0, width); // Gets the color array of the image pixels
 
+		ByteBuffer buffer = BufferUtils.createByteBuffer(image.getWidth()*image.getHeight()*4);
+
 		// Applying the RGB array into Minicraft rendering system 25 bits RBG array.
 		for (int i = 0; i < pixels.length; i++) { // Loops through all the pixels
 			int red;
@@ -87,6 +94,20 @@ public class MinicraftImage {
 			// Actually put the data in the array
 			// Uses 25 bits to store everything (8 for red, 8 for green, 8 for blue, and 1 for alpha)
 			pixels[i] = (transparent << 24) + red + green + blue;
+			buffer.put((byte)((red>>16)&0xFF));
+			buffer.put((byte)((green>>8)&0xFF));
+			buffer.put((byte)((blue)&0xFF));
+			buffer.put((byte)(transparent * 0xFF));
 		}
+		buffer.flip();
+
+		texture = glGenTextures();
+		glBindTexture(GL_TEXTURE_2D, texture);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, buffer);
+		glBindTexture(GL_TEXTURE_2D, 0);
 	}
 }

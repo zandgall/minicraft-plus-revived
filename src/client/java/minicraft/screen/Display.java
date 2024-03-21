@@ -7,6 +7,9 @@ import minicraft.gfx.Screen;
 import minicraft.screen.entry.ArrayEntry;
 import org.jetbrains.annotations.Nullable;
 
+import static org.lwjgl.opengl.GL11.GL_COLOR_BUFFER_BIT;
+import static org.lwjgl.opengl.GL11.glClear;
+
 public class Display {
 
 	private Display parent = null;

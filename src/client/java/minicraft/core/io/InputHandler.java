@@ -81,7 +81,7 @@ public class InputHandler {
 
 		for (Field keyConst : keyConstants) {
 			String name = keyConst.getName();
-			name = name.substring(9); // Removes the "VK_"
+			name = name.substring(9); // Removes the "GLFW_KEY_"
 			try {
 				keyNames.put((Integer)keyConst.get(0), name);
 			} catch (IllegalAccessException ignored) {
@@ -89,8 +89,8 @@ public class InputHandler {
 		}
 
 		// For compatibility becuase I'm lazy. :P
-//		keyNames.put(KeyEvent.VK_BACK_SPACE, "BACKSPACE");
-//		keyNames.put(KeyEvent.VK_CONTROL, "CTRL");
+		keyNames.put(GLFW_KEY_BACKSPACE, "BACKSPACE");
+		keyNames.put(GLFW_KEY_LEFT_CONTROL, "CTRL");
 	}
 
 	private HashMap<String, String> keymap; // The symbolic map of actions to physical key names.
@@ -553,7 +553,7 @@ public class InputHandler {
 		String keytext;
 
 		if (keyNames.containsKey(keycode))
-			keytext = keyNames.get(keycode); 
+			keytext = keyNames.get(keycode);
 		else {
 			Logger.tag("INPUT").error("Could not find keyname for keycode \"" + keycode + "\"");
 			return;
@@ -656,7 +656,7 @@ public class InputHandler {
 
 	// Key pressed or released
 	public void glfwKeyCallback(long window, int key, int scancode, int action, int mods) {
-		toggle(scancode, action==GLFW_PRESS);
+		toggle(key, action==GLFW_PRESS || action == GLFW_REPEAT);
 	}
 
 	// Char typed

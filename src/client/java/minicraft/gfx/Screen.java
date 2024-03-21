@@ -1,11 +1,20 @@
 package minicraft.gfx;
 
+import minicraft.core.Game;
 import minicraft.core.Renderer;
 import minicraft.core.Updater;
 import minicraft.gfx.SpriteLinker.LinkedSprite;
 import minicraft.gfx.SpriteLinker.SpriteType;
+import org.joml.Matrix4f;
+import org.joml.Vector2f;
+import org.lwjgl.BufferUtils;
+import org.lwjgl.system.MemoryStack;
 
+import java.nio.ByteBuffer;
+import java.nio.FloatBuffer;
 import java.util.Arrays;
+
+import static org.lwjgl.opengl.GL30.*;
 
 public class Screen {
 
@@ -25,6 +34,8 @@ public class Screen {
 
 	public int[] pixels; // Pixels on the screen
 
+	private final int texture, framebuffer;
+
 	// Outdated Information:
 	// Since each sheet is 256x256 pixels, each one has 1024 8x8 "tiles"
 	// So 0 is the start of the item sheet 1024 the start of the tile sheet, 2048 the start of the entity sheet,
@@ -33,7 +44,41 @@ public class Screen {
 	public Screen() {
 		/// Screen width and height are determined by the actual game window size, meaning the screen is only as big as the window.
 		pixels = new int[Screen.w * Screen.h]; // Makes new integer array for all the pixels on the screen.
+		framebuffer = glGenFramebuffers();
+		glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
+		glEnable(GL_BLEND);
+		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+		texture = glGenTextures();
+		glBindTexture(GL_TEXTURE_2D, texture);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, Renderer.WIDTH, Renderer.HEIGHT, 0, GL_RGBA, GL_UNSIGNED_BYTE, (ByteBuffer) null);
+		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, texture, 0);
+
+		glBindTexture(GL_TEXTURE_2D, 0);
+
+		if(ditherTexture == 0) {
+			ByteBuffer buffer = BufferUtils.createByteBuffer(16);
+			buffer.put((byte)0)  .put((byte)80) .put((byte)20) .put((byte)100);
+			buffer.put((byte)120).put((byte)40) .put((byte)140).put((byte)60);
+			buffer.put((byte)30) .put((byte)110).put((byte)10) .put((byte)90);
+			buffer.put((byte)150).put((byte)70) .put((byte)130).put((byte)50);
+			buffer.flip();
+			ditherTexture = glGenTextures();
+			glBindTexture(GL_TEXTURE_2D, ditherTexture);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+			glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 4, 4, 0, GL_RED, GL_UNSIGNED_BYTE, buffer);
+		}
 	}
+
+	public int getTexture() {return texture;}
+	public int getFramebuffer() {return framebuffer;}
 
 	/**
 	 * Clears all the colors on the screen
@@ -41,6 +86,11 @@ public class Screen {
 	public void clear(int color) {
 		// Turns each pixel into a single color (clearing the screen!)
 		Arrays.fill(pixels, color);
+		glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
+		glDrawBuffer(GL_COLOR_ATTACHMENT0);
+		glViewport(0, 0, Renderer.WIDTH, Renderer.HEIGHT);
+		glClearColor(((color >> 16) & 0xFF) / 255.f, ((color >> 8) & 0xFF) / 255.f, (color & 0xFF) / 255.f, ((color >> 24) & 0xFF) / 255.f);
+		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	}
 
 	public void render(int xp, int yp, int xt, int yt, int bits, MinicraftImage sheet) {
@@ -126,10 +176,38 @@ public class Screen {
 
 		int xTile = xt; // Gets x position of the spritesheet "tile"
 		int yTile = yt; // Gets y position
-		int toffs = xTile * 8 + yTile * 8 * sheet.width; // Gets the offset of the sprite into the spritesheet pixel array, the 8's represent the size of the box. (8 by 8 pixel sprite boxes)
+		try(MemoryStack stack = MemoryStack.stackPush()) {
+			glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
+			glDrawBuffer(GL_COLOR_ATTACHMENT0);
+			glViewport(0, 0, Renderer.WIDTH, Renderer.HEIGHT);
+			glUseProgram(Game.getDefaultShader());
+			FloatBuffer sp = new Matrix4f().ortho(0, Renderer.WIDTH, Renderer.HEIGHT, 0, -1, 1)
+				.get(stack.mallocFloat(16));
+			glUniformMatrix4fv(glGetUniformLocation(Game.getDefaultShader(), "screenspace"), false, sp);
+			FloatBuffer vt = new Matrix4f().identity().get(stack.mallocFloat(16));
+			glUniformMatrix4fv(glGetUniformLocation(Game.getDefaultShader(), "view"), false, vt);
+			glUniform1i(glGetUniformLocation(Game.getDefaultShader(), "texture"), 0);
+			FloatBuffer tf = new Matrix4f().identity().translate(xp+4, yp+4,0).scale(4).get(stack.mallocFloat(16));
+			glUniformMatrix4fv(glGetUniformLocation(Game.getDefaultShader(), "transform"), false, tf);
+			glUniform2f(glGetUniformLocation(Game.getDefaultShader(), "texOffset"), xt, yt);
+			glUniform2i(glGetUniformLocation(Game.getDefaultShader(), "mirror"), mirrorX ? 1 : 0, mirrorY ? 1 : 0);
+			glUniform1i(glGetUniformLocation(Game.getDefaultShader(), "fullbright"), fullbright ? 1 : 0);
+			glUniform1i(glGetUniformLocation(Game.getDefaultShader(), "useWhiteTint"), whiteTint == -1 ? 0 : 1);
+			glUniform3f(glGetUniformLocation(Game.getDefaultShader(), "whiteTint"),
+				((whiteTint >> 16) & 0xff)/255.f, ((whiteTint >> 8) & 0xff)/255.f, (whiteTint & 0xff)/255.f);
+			glUniform1i(glGetUniformLocation(Game.getDefaultShader(), "useColor"), color == 0 ? 0 : 1);
+			glUniform3f(glGetUniformLocation(Game.getDefaultShader(), "color"),
+				((color >> 16) & 0xff)/255.f, ((color >> 8) & 0xff)/255.f, (color & 0xff)/255.f);
+			glActiveTexture(GL_TEXTURE0);
+			glBindTexture(GL_TEXTURE_2D, sheet.texture);
+			glBindVertexArray(Game.getVao());
+			glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+		}
+
+//		int toffs = xTile * 8 + yTile * 8 * sheet.width; // Gets the offset of the sprite into the spritesheet pixel array, the 8's represent the size of the box. (8 by 8 pixel sprite boxes)
 
 		// THIS LOOPS FOR EVERY PIXEL
-		for (int y = 0; y < 8; y++) { // Loops 8 times (because of the height of the tile)
+		/*for (int y = 0; y < 8; y++) { // Loops 8 times (because of the height of the tile)
 			int ys = y; // Current y pixel
 			if (mirrorY) ys = 7 - y; // Reverses the pixel for a mirroring effect
 			if (y + yp < 0 || y + yp >= h) continue; // If the pixel is out of bounds, then skip the rest of the loop.
@@ -164,7 +242,7 @@ public class Screen {
 					}
 				}
 			}
-		}
+		}*/
 	}
 
 	/**
@@ -191,6 +269,8 @@ public class Screen {
 		3, 11, 1, 9,
 		15, 7, 13, 5
 	};
+
+	private static int ditherTexture = 0;
 
 	/**
 	 * Overlays the screen with pixels
@@ -221,7 +301,40 @@ public class Screen {
 		} else if (currentLevel >= 5)
 			tintFactor = -MAXDARK;
 
-		int[] oPixels = screen2.pixels;  // The Integer array of pixels to overlay the screen with.
+		glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
+		glDrawBuffer(GL_COLOR_ATTACHMENT0);
+		glViewport(0, 0, Renderer.WIDTH, Renderer.HEIGHT);
+		glEnable(GL_BLEND);
+		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+		try(MemoryStack stack = MemoryStack.stackPush()) {
+			glUseProgram(Game.getOverlayShader());
+			FloatBuffer sp = new Matrix4f().ortho(0, Renderer.WIDTH, 0, Renderer.HEIGHT,-1, 1)
+				.get(stack.mallocFloat(16));
+			glUniformMatrix4fv(glGetUniformLocation(Game.getOverlayShader(), "screenspace"), false, sp);
+			FloatBuffer vt = new Matrix4f().identity().get(stack.mallocFloat(16));
+			glUniformMatrix4fv(glGetUniformLocation(Game.getOverlayShader(), "view"), false, vt);
+			glUniform1i(glGetUniformLocation(Game.getOverlayShader(), "texture"), 0);
+			FloatBuffer tf = new Matrix4f().identity().translate(Renderer.WIDTH / 2.f, Renderer.HEIGHT / 2.f, 0)
+				.scale(Renderer.WIDTH / 2.f, Renderer.HEIGHT / 2.f, 1).get(stack.mallocFloat(16));
+			glUniformMatrix4fv(glGetUniformLocation(Game.getOverlayShader(), "transform"), false, tf);
+			glUniform1f(glGetUniformLocation(Game.getOverlayShader(), "tintFactor"), (float) (tintFactor/255.f));
+			glUniform1i(glGetUniformLocation(Game.getOverlayShader(), "currentLevel"), currentLevel);
+			glUniform2i(glGetUniformLocation(Game.getOverlayShader(), "adjustment"), xa, ya);
+			glUniform1i(glGetUniformLocation(Game.getOverlayShader(), "texture"), 0);
+			glUniform1i(glGetUniformLocation(Game.getOverlayShader(), "overlay"), 1);
+			glUniform1i(glGetUniformLocation(Game.getOverlayShader(), "dither"), 2);
+			glActiveTexture(GL_TEXTURE0);
+			glBindTexture(GL_TEXTURE_2D, texture);
+			glActiveTexture(GL_TEXTURE1);
+			glBindTexture(GL_TEXTURE_2D, screen2.getTexture());
+			glActiveTexture(GL_TEXTURE2);
+			glBindTexture(GL_TEXTURE_2D, ditherTexture);
+			glActiveTexture(GL_TEXTURE0);
+			glBindVertexArray(Game.getVao());
+			glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+		}
+
+		/*int[] oPixels = screen2.pixels;  // The Integer array of pixels to overlay the screen with.
 		int i = 0; // Current pixel on the screen
 		for (int y = 0; y < h; y++) { // loop through height of screen
 			for (int x = 0; x < w; x++) { // loop through width of screen
@@ -241,7 +354,7 @@ public class Screen {
 				pixels[i] = Color.tintColor(pixels[i], 20);
 				i++; // Moves to the next pixel.
 			}
-		}
+		}*/
 	}
 
 	public void renderLight(int x, int y, int r) {
@@ -260,21 +373,46 @@ public class Screen {
 		if (x1 > w) x1 = w;
 		if (y1 > h) y1 = h;
 
-		for (int yy = y0; yy < y1; yy++) { // Loop through each y position
-			int yd = yy - y; // Get distance to the previous y position.
-			yd = yd * yd; // Square that distance
-			for (int xx = x0; xx < x1; xx++) { // Loop though each x pos
-				int xd = xx - x; // Get x delta
-				int dist = xd * xd + yd; // Square x delta, then add the y delta, to get total distance.
-
-				if (dist <= r * r) {
-					// If the distance from the center (x,y) is less or equal to the radius...
-					int br = 255 - dist * 255 / (r * r); // area where light will be rendered. // r*r is becuase dist is still x*x+y*y, of pythag theorem.
-					// br = brightness... literally. from 0 to 255.
-					if (pixels[xx + yy * w] < br)
-						pixels[xx + yy * w] = br; // Pixel cannot be smaller than br; in other words, the pixel color (brightness) cannot be less than br.
-				}
-			}
+		glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
+		glDrawBuffer(GL_COLOR_ATTACHMENT0);
+		glViewport(0, 0, Renderer.WIDTH, Renderer.HEIGHT);
+		glEnable(GL_BLEND);
+		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+		try(MemoryStack stack = MemoryStack.stackPush()) {
+			glUseProgram(Game.getLightingShader());
+			FloatBuffer sp = new Matrix4f().ortho(0, Renderer.WIDTH, Renderer.HEIGHT, 0, -1, 1)
+				.get(stack.mallocFloat(16));
+			glUniformMatrix4fv(glGetUniformLocation(Game.getLightingShader(), "screenspace"), false, sp);
+			FloatBuffer vt = new Matrix4f().identity().get(stack.mallocFloat(16));
+			glUniformMatrix4fv(glGetUniformLocation(Game.getLightingShader(), "view"), false, vt);
+			glUniform1i(glGetUniformLocation(Game.getLightingShader(), "texture"), 0);
+			FloatBuffer tf = new Matrix4f().identity().translate((x0+x1) / 2.f, (y0+y1) / 2.f, 0)
+				.scale((x1-x0) / 2.f, (y1-y0) / 2.f, 1).get(stack.mallocFloat(16));
+			glUniformMatrix4fv(glGetUniformLocation(Game.getLightingShader(), "transform"), false, tf);
+			glUniform4i(glGetUniformLocation(Game.getLightingShader(), "rectangle"), x0, y0, x1, y1);
+			glUniform2i(glGetUniformLocation(Game.getLightingShader(), "screenSize"), Renderer.WIDTH, Renderer.HEIGHT);
+			glUniform1i(glGetUniformLocation(Game.getLightingShader(), "r"), r);
+			glActiveTexture(GL_TEXTURE0);
+			glBindTexture(GL_TEXTURE_2D, texture);
+			glBindVertexArray(Game.getVao());
+			glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
 		}
+
+//		for (int yy = y0; yy < y1; yy++) { // Loop through each y position
+//			int yd = yy - y; // Get distance to the previous y position.
+//			yd = yd * yd; // Square that distance
+//			for (int xx = x0; xx < x1; xx++) { // Loop though each x pos
+//				int xd = xx - x; // Get x delta
+//				int dist = xd * xd + yd; // Square x delta, then add the y delta, to get total distance.
+//
+//				if (dist <= r * r) {
+//					// If the distance from the center (x,y) is less or equal to the radius...
+//					int br = 255 - dist * 255 / (r * r); // area where light will be rendered. // r*r is becuase dist is still x*x+y*y, of pythag theorem.
+//					// br = brightness... literally. from 0 to 255.
+//					if (pixels[xx + yy * w] < br)
+//						pixels[xx + yy * w] = br; // Pixel cannot be smaller than br; in other words, the pixel color (brightness) cannot be less than br.
+//				}
+//			}
+//		}
 	}
 }

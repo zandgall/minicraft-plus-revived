@@ -34,10 +34,14 @@ import minicraft.screen.entry.ListEntry;
 import minicraft.screen.entry.StringEntry;
 import minicraft.util.Quest;
 import minicraft.util.Quest.QuestSeries;
+import org.joml.Matrix4f;
+import org.lwjgl.BufferUtils;
+import org.lwjgl.system.MemoryStack;
 
 import javax.imageio.ImageIO;
 
 import java.awt.Canvas;
+import java.awt.Dimension;
 import java.awt.Graphics;
 import java.awt.geom.AffineTransform;
 import java.awt.image.AffineTransformOp;
@@ -46,6 +50,8 @@ import java.awt.image.BufferedImage;
 import java.awt.image.DataBufferInt;
 import java.io.File;
 import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.nio.FloatBuffer;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
@@ -53,6 +59,8 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+
+import static org.lwjgl.opengl.GL30.*;
 
 public class Renderer extends Game {
 	private Renderer() {
@@ -62,13 +70,14 @@ public class Renderer extends Game {
 	public static int WIDTH = 288;
 	static float SCALE = 3;
 
+	public static Dimension WINDOW_SIZE;
+
 	public static Screen screen; // Creates the main screen
 	public static SpriteLinker spriteLinker = new SpriteLinker(); // The sprite linker for sprites
 
 //	static Canvas canvas = new Canvas();
 	static Canvas canvas = null;
 	private static BufferedImage image; // Creates an image to be displayed on the screen.
-
 	private static Screen lightScreen; // Creates a front screen to render the darkness in caves (Fog of war).
 
 	public static boolean readyToRenderGameplay = false;
@@ -106,6 +115,8 @@ public class Renderer extends Game {
 		screen.pixels = ((DataBufferInt) image.getRaster().getDataBuffer()).getData();
 		hudSheet = new LinkedSprite(SpriteType.Gui, "hud");
 
+		WINDOW_SIZE = getWindowSize();
+
 //		canvas.createBufferStrategy(3);
 	}
 
@@ -115,7 +126,6 @@ public class Renderer extends Game {
 	 */
 	public static void render() {
 		if (screen == null) return; // No point in this if there's no gui... :P
-		if (canvas == null) return;
 
 		if (readyToRenderGameplay) {
 			renderLevel();
@@ -125,64 +135,65 @@ public class Renderer extends Game {
 		if (currentDisplay != null) // Renders menu, if present.
 			currentDisplay.render(screen);
 
-		if (!canvas.hasFocus())
+		if (!Game.isFocused())
 			renderFocusNagger(); // Calls the renderFocusNagger() method, which creates the "Click to Focus" message.
 
-
-		BufferStrategy bs = canvas.getBufferStrategy(); // Creates a buffer strategy to determine how the graphics should be buffered.
-		Graphics g = bs.getDrawGraphics(); // Gets the graphics in which java draws the picture
-		g.fillRect(0, 0, canvas.getWidth(), canvas.getHeight()); // Draws a rect to fill the whole window (to cover last?)
+//		if (canvas == null) return;
 
 		// Scale the pixels.
 		int ww = getWindowSize().width;
 		int hh = getWindowSize().height;
 
 		// Get the image offset.
-		int xOffset = (canvas.getWidth() - ww) / 2 + canvas.getParent().getInsets().left;
-		int yOffset = (canvas.getHeight() - hh) / 2 + canvas.getParent().getInsets().top;
+		int xOffset = (WINDOW_SIZE.width - ww) / 2;
+		int yOffset = (WINDOW_SIZE.height - hh) / 2;
+
+//		BufferStrategy bs = canvas.getBufferStrategy(); // Creates a buffer strategy to determine how the graphics should be buffered.
+//		Graphics g = bs.getDrawGraphics(); // Gets the graphics in which java draws the picture
+//		g.fillRect(0, 0, canvas.getWidth(), canvas.getHeight()); // Draws a rect to fill the whole window (to cover last?)
 
 		// Draw the image on the window.
-		g.drawImage(image, xOffset, yOffset, ww, hh, null);
+//		g.drawImage(image, xOffset, yOffset, ww, hh, null);
 
 		// Release any system items that are using this method. (so we don't have crappy framerates)
-		g.dispose();
+//		g.dispose();
 
 		// Make the picture visible.
-		bs.show();
+//		bs.show();
 
 		// Screen capturing.
-		if (Updater.screenshot > 0) {
-			new File(Game.gameDir + "/screenshots/").mkdirs();
-			int count = 1;
-			LocalDateTime datetime = LocalDateTime.now();
-			String stamp = DateTimeFormatter.ofPattern("yyyy-MM-dd_HH.mm.ss").format(datetime);
-			File file = new File(String.format("%s/screenshots/%s.png", Game.gameDir, stamp));
-			while (file.exists()) {
-				file = new File(String.format("%s/screenshots/%s_%s.png", Game.gameDir, stamp, count));
-				count++;
-			}
-
-			try { // https://stackoverflow.com/a/4216635
-				int w = image.getWidth();
-				int h = image.getHeight();
-				BufferedImage before = new BufferedImage(w, h, BufferedImage.TYPE_INT_RGB);
-				before.getRaster().setRect(image.getData());
-				int scale = (Integer) Settings.get("screenshot");
-				// BufferedImage after = BigBufferedImage.create(scale * w, scale * h, BufferedImage.TYPE_INT_RGB);
-				AffineTransform at = new AffineTransform();
-				at.scale(scale, scale); // Setting the scaling.
-				AffineTransformOp scaleOp = new AffineTransformOp(at, AffineTransformOp.TYPE_NEAREST_NEIGHBOR);
-
-				// Use this solution without larger scales which use up a lot of memory.
-				// With scale 20, up to around 360MB overall RAM use.
-				BufferedImage after = scaleOp.filter(before, null);
-				ImageIO.write(after, "png", file);
-			} catch (IOException e) {
-				CrashHandler.errorHandle(e);
-			}
-
-			Updater.screenshot--;
-		}
+//		if (Updater.screenshot > 0) {
+//			new File(Game.gameDir + "/screenshots/").mkdirs();
+//			int count = 1;
+//			LocalDateTime datetime = LocalDateTime.now();
+//			String stamp = DateTimeFormatter.ofPattern("yyyy-MM-dd_HH.mm.ss").format(datetime);
+//			File file = new File(String.format("%s/screenshots/%s.png", Game.gameDir, stamp));
+//			while (file.exists()) {
+//				file = new File(String.format("%s/screenshots/%s_%s.png", Game.gameDir, stamp, count));
+//				count++;
+//			}
+//
+//			try { // https://stackoverflow.com/a/4216635
+//				int w = image.getWidth();
+//				int h = image.getHeight();
+//				BufferedImage before = new BufferedImage(w, h, BufferedImage.TYPE_INT_RGB);
+//				before.getRaster().setRect(image.getData());
+//				int scale = (Integer) Settings.get("screenshot");
+//				// BufferedImage after = BigBufferedImage.create(scale * w, scale * h, BufferedImage.TYPE_INT_RGB);
+//				AffineTransform at = new AffineTransform();
+//				at.scale(scale, scale); // Setting the scaling.
+//				AffineTransformOp scaleOp = new AffineTransformOp(at, AffineTransformOp.TYPE_NEAREST_NEIGHBOR);
+//
+//				// Use this solution without larger scales which use up a lot of memory.
+//				// With scale 20, up to around 360MB overall RAM use.
+//				BufferedImage after = scaleOp.filter(before, null);
+//				ImageIO.write(after, "png", file);
+//			} catch (IOException e) {
+//				CrashHandler.errorHandle(e);
+//			}
+//
+//			Updater.screenshot--;
+//		}
 	}
 
 

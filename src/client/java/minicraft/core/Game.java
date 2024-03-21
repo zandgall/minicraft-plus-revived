@@ -19,6 +19,10 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.List;
 
+import static org.lwjgl.glfw.GLFW.GLFW_TRUE;
+import static org.lwjgl.glfw.GLFW.glfwSetWindowShouldClose;
+import static org.lwjgl.glfw.GLFW.glfwWindowShouldClose;
+
 public class Game {
 	protected Game() {
 	} // Can't instantiate the Game class.
@@ -38,6 +42,15 @@ public class Game {
 	public static boolean isFocused() {
 		return focused;
 	}
+
+	static long window;
+	static int vao, defaultShader, overlayShader, postprocessShader, lightingShader;
+	public static int getVao() {return vao;}
+	public static int getDefaultShader() {return defaultShader;}
+	public static int getOverlayShader() {return overlayShader;}
+	public static int getPostprocessShader() {return postprocessShader;}
+	public static int getLightingShader() {return lightingShader;}
+	public static long getWindow() {return window;}
 
 	// DISPLAY
 	static Display currentDisplay = null;
@@ -93,7 +106,7 @@ public class Game {
 	static boolean running = true;
 
 	public static void quit() {
-		running = false;
+		glfwSetWindowShouldClose(window, true);
 	}
 
 
@@ -106,6 +119,8 @@ public class Game {
 		Analytics.GameStartup.ping();
 
 		input = new InputHandler();
+
+		Initializer.init();
 
 		ResourcePackDisplay.initPacks();
 		ResourcePackDisplay.reloadResources();
@@ -128,7 +143,6 @@ public class Game {
 		if (Updater.FULLSCREEN) {
 			Updater.updateFullscreen();
 		}
-		Initializer.init();
 		Initializer.launchWindow();
 		// Actually start the game.
 		Initializer.run();
