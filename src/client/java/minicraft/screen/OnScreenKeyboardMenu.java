@@ -38,7 +38,7 @@ public class OnScreenKeyboardMenu extends Menu {
 	 */
 	@Nullable
 	public static OnScreenKeyboardMenu checkAndCreateMenu() {
-		if (Game.input.anyControllerConnected()) {
+		if (Game.input.anyControllerConnected() || !Game.input.anyControllerConnected()) {
 			return new OnScreenKeyboardMenu();
 		}
 
