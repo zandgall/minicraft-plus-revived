@@ -179,10 +179,6 @@ public class Sound {
 	public void play() {
 		if (!(boolean) Settings.get("sound") || source == NULL) return;
 
-//		if (clip.isRunning() || clip.isActive())
-//			clip.stop();
-//
-//		clip.start();
 		alSourcePlay(source);
 	}
 
@@ -192,9 +188,7 @@ public class Sound {
 		alSourcei(source, AL_LOOPING, start ? 1 : 0);
 		if (start)
 			alSourcePlay(source);
-//			clip.loop(Clip.LOOP_CONTINUOUSLY);
 		else
 			alSourceStop(source);
-//			clip.stop();
 	}
 }

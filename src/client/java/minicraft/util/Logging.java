@@ -23,6 +23,7 @@ public final class Logging {
 	public static final TaggedLogger RESOURCEHANDLER_SOUND = Logger.tag("Resource Handler/Sound");
 	public static final TaggedLogger RESOURCEHANDLER_SKIN = Logger.tag("Resource Handler/Skin");
 	public static final TaggedLogger RESOURCEHANDLER_RESOURCEPACK = Logger.tag("Resource Handler/Resource Pack");
+	public static final TaggedLogger RESOURCEHANDLER_SHADER = Logger.tag("Resource Handler/Shader");
 	public static final TaggedLogger SAVELOAD = Logger.tag("SaveLoad");
 	public static final TaggedLogger ACHIEVEMENT = Logger.tag("Achievement");
 	public static final TaggedLogger ENTITY = Logger.tag("Entity");

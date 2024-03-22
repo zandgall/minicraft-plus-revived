@@ -42,13 +42,8 @@ public class Game {
 	}
 
 	static long window;
-	static int vao, defaultShader, overlayShader, postprocessShader, lightingShader, passthroughShader;
+	static int vao;
 	public static int getVao() {return vao;}
-	public static int getDefaultShader() {return defaultShader;}
-	public static int getOverlayShader() {return overlayShader;}
-	public static int getPostprocessShader() {return postprocessShader;}
-	public static int getLightingShader() {return lightingShader;}
-	public static int getPassthroughShader() {return passthroughShader;}
 	public static long getWindow() {return window;}
 
 	// DISPLAY

@@ -6,6 +6,7 @@ import minicraft.core.Renderer;
 import minicraft.core.io.FileHandler;
 import minicraft.core.io.InputHandler;
 import minicraft.core.io.Localization;
+import minicraft.core.io.Shader;
 import minicraft.core.io.Sound;
 import minicraft.gfx.Color;
 import minicraft.gfx.Font;
@@ -68,6 +69,8 @@ public class ResourcePackDisplay extends Display {
 	 * 		│	└──	<locale>.json
 	 * 		├──	sound
 	 * 		│	└──	<name>.wav
+	 * 		├──	shaders
+	 * 		│	└──	<name>.shader
 	 * 		└──	textures
 	 * 			├──	entity
 	 * 			│	└──	<entity_name>.png
@@ -747,6 +750,7 @@ public class ResourcePackDisplay extends Display {
 					loadLocalization(pack);
 					loadBooks(pack);
 					loadSounds(pack);
+					loadShaders(pack);
 					pack.close();
 				} catch (IOException e) {
 					CrashHandler.errorHandle(e);
@@ -982,5 +986,37 @@ public class ResourcePackDisplay extends Display {
 				Logging.RESOURCEHANDLER_LOCALIZATION.debug(e, "Unable to load audio: {} in pack : {}", f, pack.name);
 			}
 		}
+	}
+
+	/**
+	 * Loading shaders from the pack
+	 *
+	 * @param pack The pack to be loaded
+	 */
+	private static void loadShaders(ResourcePack pack) {
+		for (String path : pack.getFiles("assets/shaders/", (path, isDir) -> path.toString().endsWith(".shader") && !isDir)) {
+			try {
+				String shaderProgram = readStringFromInputStream(pack.getResourceAsStream(path));
+				switch(path) {
+					case "assets/shaders/tile.shader":
+						Shader.tile = new Shader.TileShader(shaderProgram);
+						break;
+					case "assets/shaders/overlay.shader":
+						Shader.overlay = new Shader.OverlayShader(shaderProgram);
+						break;
+					case "assets/shaders/passthrough.shader":
+						Shader.passthrough = new Shader.PassthroughShader(shaderProgram);
+						break;
+					case "assets/shaders/postprocess.shader":
+						Shader.postprocess = new Shader.PostprocessShader(shaderProgram);
+						break;
+					case "assets/shaders/lighting.shader":
+						Shader.lighting = new Shader.LightingShader(shaderProgram);
+						break;
+				}
+			} catch (IOException | RuntimeException e) {
+                Logging.RESOURCEHANDLER_SHADER.debug(e, "Unable to load shader: {} in pack : {}", path, pack.name);
+            }
+        }
 	}
 }

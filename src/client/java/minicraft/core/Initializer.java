@@ -2,6 +2,7 @@ package minicraft.core;
 
 import minicraft.core.io.FileHandler;
 import minicraft.core.io.Localization;
+import minicraft.core.io.Shader;
 import minicraft.util.Logging;
 import minicraft.util.TinylogLoggingProvider;
 import org.jetbrains.annotations.Nullable;
@@ -125,273 +126,6 @@ public class Initializer extends Game {
 		glEnableVertexAttribArray(2);
 		glVertexAttribPointer(2, 3, GL_FLOAT, false, 9*Float.BYTES, 6*Float.BYTES);
 
-		defaultShader = glCreateProgram();
-		int vs = glCreateShader(GL_VERTEX_SHADER);
-		glShaderSource(vs, """
-#version 330 core
-
-layout (location = 0) in vec4 in_position;
-layout (location = 1) in vec2 in_uv;
-layout (location = 2) in vec3 in_normal;
-
-// Only using UV
-out vec2 uv;
-
-uniform mat4 screenspace, view, transform;
-
-void main() {
-	gl_Position = screenspace * view * transform * in_position;
-	uv = in_uv;
-}""");
-		glCompileShader(vs);
-		int[] result = new int[]{0};
-		glGetShaderiv(vs, GL_COMPILE_STATUS, result);
-		if(result[0] == GL_FALSE) {
-			System.out.println(glGetShaderInfoLog(vs));
-			glDeleteShader(vs);
-		}
-		int fs = glCreateShader(GL_FRAGMENT_SHADER);
-		glShaderSource(fs, """
-#version 330 core
-
-in vec2 uv;
-
-uniform sampler2D texture;
-uniform vec2 texOffset;
-uniform bvec2 mirror;
-uniform bool fullbright;
-uniform bool useWhiteTint;
-uniform vec3 whiteTint;
-uniform bool useColor;
-uniform vec3 color;
-uniform bool textured;
-
-out vec4 out_color;
-
-void main() {
-	if (!textured) {
-		out_color = vec4(color, 1);
-		return;
-	}
-	vec2 nUV = uv;
-	if(mirror.x)
-		nUV.x = 1 - nUV.x;
-	if(mirror.y)
-		nUV.y = 1 - nUV.y;
-	nUV += texOffset;
-	nUV *= 8;
-	nUV /= textureSize(texture, 0);
-	out_color = texture2D(texture, nUV);
-	if(useWhiteTint && out_color.xyz == vec3(1))
-		out_color.xyz = whiteTint;
-	else if(fullbright)
-		out_color.xyz = vec3(1);
-	else if(useColor)
-		out_color.xyz = color;
-}""");
-		glCompileShader(fs);
-		glGetShaderiv(fs, GL_COMPILE_STATUS, result);
-		if(result[0] == GL_FALSE) {
-			System.out.println(glGetShaderInfoLog(fs));
-			glDeleteShader(fs);
-		}
-
-		glAttachShader(defaultShader, vs);
-		glAttachShader(defaultShader, fs);
-		glLinkProgram(defaultShader);
-		glValidateProgram(defaultShader);
-		glUseProgram(defaultShader);
-		try(MemoryStack stack = MemoryStack.stackPush()) {
-			FloatBuffer sp = new Matrix4f().ortho(0, Renderer.WIDTH, Renderer.HEIGHT, 0, -1, 1)
-				.get(stack.mallocFloat(16));
-			glUniformMatrix4fv(glGetUniformLocation(defaultShader, "screenspace"), false, sp);
-			FloatBuffer vt = new Matrix4f().identity().get(stack.mallocFloat(16));
-			glUniformMatrix4fv(glGetUniformLocation(defaultShader, "view"), false, vt);
-			glUniform1i(glGetUniformLocation(defaultShader, "texture"), 0);
-		}
-
-		glDeleteShader(fs);
-
-		overlayShader = glCreateProgram();
-		fs = glCreateShader(GL_FRAGMENT_SHADER);
-		glShaderSource(fs, """
-#version 330 core
-
-in vec2 uv;
-
-uniform sampler2D texture;
-uniform sampler2D overlay;
-uniform sampler2D dither;
-uniform float tintFactor;
-uniform int currentLevel;
-uniform vec2 adjust;
-
-out vec4 out_color;
-
-void main() {
-//	out_color = vec4(1,0,0,0.5);
-	vec2 nUV = uv * textureSize(texture, 0) / textureSize(dither, 0); // make pixel sizes consistent
-	nUV += adjust / textureSize(dither, 0);
-	out_color = texture2D(texture, uv);
-	float overlayAmount = texture2D(overlay, uv).x;
-	float ditherSample = texture2D(dither, nUV).x;
-	if (overlayAmount <= ditherSample) {
-		if (currentLevel < 3) {
-			out_color = vec4(0,0,0,1);
-		} else {
-			out_color.xyz += vec3(tintFactor);
-		}
-	}
-	out_color.xyz += vec3(20.f/256.f);
-	//	out_color.w = 0;
-}""");
-		glCompileShader(fs);
-		glGetShaderiv(fs, GL_COMPILE_STATUS, result);
-		if(result[0] == GL_FALSE) {
-			System.out.println(glGetShaderInfoLog(fs));
-			glDeleteShader(fs);
-		}
-
-		glAttachShader(overlayShader, vs);
-		glAttachShader(overlayShader, fs);
-		glLinkProgram(overlayShader);
-		glValidateProgram(overlayShader);
-		glUseProgram(overlayShader);
-		try(MemoryStack stack = MemoryStack.stackPush()) {
-			FloatBuffer sp = new Matrix4f().ortho(0, Renderer.WIDTH, 0, Renderer.HEIGHT,-1, 1)
-				.get(stack.mallocFloat(16));
-			glUniformMatrix4fv(glGetUniformLocation(overlayShader, "screenspace"), false, sp);
-			FloatBuffer vt = new Matrix4f().identity().get(stack.mallocFloat(16));
-			glUniformMatrix4fv(glGetUniformLocation(overlayShader, "view"), false, vt);
-			glUniform1i(glGetUniformLocation(overlayShader, "texture"), 0);
-			glUniform1i(glGetUniformLocation(overlayShader, "overlay"), 1);
-			glUniform1i(glGetUniformLocation(overlayShader, "dither"), 2);
-		}
-
-		glDeleteShader(fs);
-
-		passthroughShader = glCreateProgram();
-		fs = glCreateShader(GL_FRAGMENT_SHADER);
-		glShaderSource(fs, """
-#version 330 core
-
-in vec2 uv;
-
-uniform sampler2D texture;
-
-out vec4 out_color;
-
-void main() {
-	out_color = texture2D(texture, uv);
-}""");
-		glCompileShader(fs);
-		glGetShaderiv(fs, GL_COMPILE_STATUS, result);
-		if(result[0] == GL_FALSE) {
-			System.out.println(glGetShaderInfoLog(fs));
-			glDeleteShader(fs);
-		}
-
-		glAttachShader(passthroughShader, vs);
-		glAttachShader(passthroughShader, fs);
-		glLinkProgram(passthroughShader);
-		glValidateProgram(passthroughShader);
-		glUseProgram(passthroughShader);
-		try(MemoryStack stack = MemoryStack.stackPush()) {
-			FloatBuffer sp = new Matrix4f().ortho(0, Renderer.WIDTH, 0, Renderer.HEIGHT,-1, 1)
-				.get(stack.mallocFloat(16));
-			glUniformMatrix4fv(glGetUniformLocation(passthroughShader, "screenspace"), false, sp);
-			FloatBuffer vt = new Matrix4f().identity().get(stack.mallocFloat(16));
-			glUniformMatrix4fv(glGetUniformLocation(passthroughShader, "view"), false, vt);
-			glUniform1i(glGetUniformLocation(passthroughShader, "texture"), 0);
-			glUniform1i(glGetUniformLocation(passthroughShader, "overlay"), 1);
-			glUniform1i(glGetUniformLocation(passthroughShader, "dither"), 2);
-		}
-
-		glDeleteShader(fs);
-
-		postprocessShader = glCreateProgram();
-		fs = glCreateShader(GL_FRAGMENT_SHADER);
-		glShaderSource(fs, """
-#version 330 core
-
-in vec2 uv;
-
-uniform sampler2D texture;
-
-out vec4 out_color;
-
-void main() {
-	out_color = texture2D(texture, uv);
-}""");
-		glCompileShader(fs);
-		glGetShaderiv(fs, GL_COMPILE_STATUS, result);
-		if(result[0] == GL_FALSE) {
-			System.out.println(glGetShaderInfoLog(fs));
-			glDeleteShader(fs);
-		}
-
-		glAttachShader(postprocessShader, vs);
-		glAttachShader(postprocessShader, fs);
-		glLinkProgram(postprocessShader);
-		glValidateProgram(postprocessShader);
-		glUseProgram(postprocessShader);
-		try(MemoryStack stack = MemoryStack.stackPush()) {
-			FloatBuffer sp = new Matrix4f().ortho(0, Renderer.WIDTH, 0, Renderer.HEIGHT, -1, 1)
-				.get(stack.mallocFloat(16));
-			glUniformMatrix4fv(glGetUniformLocation(postprocessShader, "screenspace"), false, sp);
-			FloatBuffer vt = new Matrix4f().identity().get(stack.mallocFloat(16));
-			glUniformMatrix4fv(glGetUniformLocation(postprocessShader, "view"), false, vt);
-			glUniform1i(glGetUniformLocation(postprocessShader, "texture"), 0);
-		}
-
-		glDeleteShader(fs);
-
-		lightingShader = glCreateProgram();
-		fs = glCreateShader(GL_FRAGMENT_SHADER);
-		glShaderSource(fs, """
-#version 330 core
-
-in vec2 uv;
-
-uniform sampler2D texture;
-uniform ivec4 rectangle;
-uniform ivec2 screenSize;
-uniform int r;
-
-out vec4 out_color;
-
-void main() {
-	vec2 p = (uv-vec2(0.5))*(rectangle.zw-rectangle.xy);
-	float dist = p.x*p.x + p.y*p.y;
-	float br = 1 - dist / (r * r);
-//	vec2 pUV = (uv * (rectangle.zw-rectangle.xy) + rectangle.xy) / screenSize;
-	out_color = vec4(1, 0, 0, br);
-}""");
-		glCompileShader(fs);
-		glGetShaderiv(fs, GL_COMPILE_STATUS, result);
-		if(result[0] == GL_FALSE) {
-			System.out.println(glGetShaderInfoLog(fs));
-			glDeleteShader(fs);
-		}
-
-		glAttachShader(lightingShader, vs);
-		glAttachShader(lightingShader, fs);
-		glLinkProgram(lightingShader);
-		glValidateProgram(lightingShader);
-		glUseProgram(lightingShader);
-		try(MemoryStack stack = MemoryStack.stackPush()) {
-			FloatBuffer sp = new Matrix4f().ortho(0, Renderer.WIDTH, Renderer.HEIGHT, 0, -1, 1)
-				.get(stack.mallocFloat(16));
-			glUniformMatrix4fv(glGetUniformLocation(lightingShader, "screenspace"), false, sp);
-			FloatBuffer vt = new Matrix4f().identity().get(stack.mallocFloat(16));
-			glUniformMatrix4fv(glGetUniformLocation(lightingShader, "view"), false, vt);
-			glUniform1i(glGetUniformLocation(lightingShader, "texture"), 0);
-		}
-
-		glDeleteShader(fs);
-
-		glDeleteShader(vs);
-
 		glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 		glDisable(GL_DEPTH_TEST);
 		glEnable(GL_BLEND);
@@ -414,18 +148,21 @@ void main() {
 				frames++;
 				lastRender = now;
 				Renderer.render();
-				try(MemoryStack stack = MemoryStack.stackPush()) {
-					glBindFramebuffer(GL_FRAMEBUFFER, 0);
-					glViewport(0, 0, WINDOW_SIZE.width, WINDOW_SIZE.height);
-					glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-					glUseProgram(postprocessShader);
-					FloatBuffer tf = new Matrix4f().identity().translate(Renderer.WIDTH/2.f, Renderer.HEIGHT/2.f,0).scale(Renderer.WIDTH/2.f, Renderer.HEIGHT/2.f, 1).get(stack.mallocFloat(16));
-					glUniformMatrix4fv(glGetUniformLocation(defaultShader, "transform"), false, tf);
-					glActiveTexture(GL_TEXTURE0);
-					glBindVertexArray(vao);
-					glBindTexture(GL_TEXTURE_2D, screen.getTexture());
-					glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
-				}
+
+				glBindFramebuffer(GL_FRAMEBUFFER, 0);
+				glViewport(0, 0, WINDOW_SIZE.width, WINDOW_SIZE.height);
+				glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+				Shader.postprocess.use();
+				Shader.postprocess.setTransform(
+					new Matrix4f().identity()
+						.translate(Renderer.WIDTH/2.f, Renderer.HEIGHT/2.f,0)
+						.scale(Renderer.WIDTH/2.f, Renderer.HEIGHT/2.f, 1)
+				);
+				Shader.postprocess.setTexture(screen.getTexture());
+				glBindVertexArray(vao);
+				glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+
 				glfwSwapBuffers(window);
 			}
 
@@ -451,17 +188,6 @@ void main() {
 				ticks = 0; // Resets ticks; ie, frames and ticks only are per second
 			}
 
-//			try(MemoryStack stack = MemoryStack.stackPush()) {
-//				glUseProgram(shader);
-//				FloatBuffer sp = new Matrix4f().ortho(0, Renderer.getWindowSize().width, Renderer.getWindowSize().height, 0,
-//					-1, 1).get(stack.mallocFloat(16));
-//				glUniformMatrix4fv(glGetUniformLocation(shader, "screenspace"), false, sp);
-//				FloatBuffer tf = new Matrix4f().identity().translate(100, 100, 0).scale(100).get(stack.mallocFloat(16));
-//				glUniformMatrix4fv(glGetUniformLocation(shader, "transform"), false, tf);
-//			}
-//
-//			glBindVertexArray(vao);
-//			glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
 			glfwPollEvents();
 		}
 
@@ -516,7 +242,7 @@ void main() {
 
 		glfwMakeContextCurrent(window);
 
-		glfwSwapInterval(1);
+//		glfwSwapInterval(1);
 
 		glfwShowWindow(window);
 

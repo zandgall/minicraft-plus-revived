@@ -3,6 +3,7 @@ package minicraft.gfx;
 import minicraft.core.Game;
 import minicraft.core.Renderer;
 import minicraft.core.Updater;
+import minicraft.core.io.Shader;
 import minicraft.gfx.SpriteLinker.LinkedSprite;
 import minicraft.gfx.SpriteLinker.SpriteType;
 import org.joml.Matrix4f;
@@ -182,30 +183,20 @@ public class Screen {
 			yt = 0;
 		}
 
-		try(MemoryStack stack = MemoryStack.stackPush()) {
-			glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
-			glViewport(0, 0, width, height);
-			glUseProgram(Game.getDefaultShader());
-			FloatBuffer sp = new Matrix4f().ortho(0, width, height, 0,-1, 1)
-				.get(stack.mallocFloat(16));
-			glUniformMatrix4fv(glGetUniformLocation(Game.getDefaultShader(), "screenspace"), false, sp);
-			FloatBuffer tf = new Matrix4f().identity().translate(xp+4, yp+4,0).scale(4).get(stack.mallocFloat(16));
-			glUniformMatrix4fv(glGetUniformLocation(Game.getDefaultShader(), "transform"), false, tf);
-			glUniform1i(glGetUniformLocation(Game.getDefaultShader(), "textured"), 1);
-			glUniform2f(glGetUniformLocation(Game.getDefaultShader(), "texOffset"), xt, yt);
-			glUniform2i(glGetUniformLocation(Game.getDefaultShader(), "mirror"), mirrorX ? 1 : 0, mirrorY ? 1 : 0);
-			glUniform1i(glGetUniformLocation(Game.getDefaultShader(), "fullbright"), fullbright ? 1 : 0);
-			glUniform1i(glGetUniformLocation(Game.getDefaultShader(), "useWhiteTint"), whiteTint == -1 ? 0 : 1);
-			glUniform3f(glGetUniformLocation(Game.getDefaultShader(), "whiteTint"),
-				((whiteTint >> 16) & 0xff)/255.f, ((whiteTint >> 8) & 0xff)/255.f, (whiteTint & 0xff)/255.f);
-			glUniform1i(glGetUniformLocation(Game.getDefaultShader(), "useColor"), color == 0 ? 0 : 1);
-			glUniform3f(glGetUniformLocation(Game.getDefaultShader(), "color"),
-				((color >> 16) & 0xff)/255.f, ((color >> 8) & 0xff)/255.f, (color & 0xff)/255.f);
-			glActiveTexture(GL_TEXTURE0);
-			glBindTexture(GL_TEXTURE_2D, sheet.texture);
-			glBindVertexArray(Game.getVao());
-			glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
-		}
+		glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
+		glViewport(0, 0, width, height);
+		Shader.tile.use();
+		Shader.tile.setProjection(new Matrix4f().ortho(0, width, height, 0, -1, 1));
+		Shader.tile.setTransform(new Matrix4f().identity().translate(xp + 4, yp + 4, 0).scale(4));
+		Shader.tile.setTexOffset(xt, yt);
+		Shader.tile.setMirror(mirrorX, mirrorY);
+		Shader.tile.setFullBright(fullbright);
+		Shader.tile.setWhiteTint(whiteTint);
+		Shader.tile.setColor(color);
+		Shader.tile.setTexture(sheet.texture);
+		glBindVertexArray(Game.getVao());
+		glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+
 	}
 
 	/**
@@ -214,47 +205,33 @@ public class Screen {
 	 * @param y Screen y-coordinate
 	 */
 	public void render(int x, int y, int width, int height, int color) {
-		try(MemoryStack stack = MemoryStack.stackPush()) {
-			glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
-			glViewport(0, 0, this.width, this.height);
+		glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
+		glViewport(0, 0, this.width, this.height);
 
-			glUseProgram(Game.getDefaultShader());
-			FloatBuffer sp = new Matrix4f().ortho(0, this.width, this.height, 0, -1, 1)
-				.get(stack.mallocFloat(16));
-			glUniformMatrix4fv(glGetUniformLocation(Game.getDefaultShader(), "screenspace"), false, sp);
-			FloatBuffer tf = new Matrix4f().identity().translate(x+width*0.5f, y+height*0.5f,1).scale(width*0.5f, height*0.5f, 1).get(stack.mallocFloat(16));
-			glUniformMatrix4fv(glGetUniformLocation(Game.getDefaultShader(), "transform"), false, tf);
-			glUniform1i(glGetUniformLocation(Game.getDefaultShader(), "textured"), 0);
-			glUniform1i(glGetUniformLocation(Game.getDefaultShader(), "useColor"), color == 0 ? 0 : 1);
-			glUniform3f(glGetUniformLocation(Game.getDefaultShader(), "color"),
-				((color >> 16) & 0xff)/255.f, ((color >> 8) & 0xff)/255.f, (color & 0xff)/255.f);
-
-			glBindVertexArray(Game.getVao());
-			glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
-		}
+		Shader.tile.use();
+		Shader.tile.setProjection(new Matrix4f().ortho(0, this.width, this.height, 0, -1, 1));
+		Shader.tile.setTransform(new Matrix4f().identity().translate(x+width*0.5f, y+height*0.5f, 1).scale(width*0.5f, height*0.5f, 1));
+		Shader.tile.setColor(color);
+		Shader.tile.setTexture(0);
+		glBindVertexArray(Game.getVao());
+		glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
 	}
 
 	/**
 	 * Draws a screen on top of another screen, without the overlay effect(s)
 	 */
 	public void render(int xp, int yp, Screen screen2) {
-		try(MemoryStack stack = MemoryStack.stackPush()) {
-			glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
-			glViewport(0, 0, w, h);
+		glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
+		glViewport(0, 0, w, h);
 
-			glUseProgram(Game.getPassthroughShader());
-			FloatBuffer sp = new Matrix4f().ortho(0, width, height, 0,-1, 1)
-				.get(stack.mallocFloat(16));
-			glUniformMatrix4fv(glGetUniformLocation(Game.getPassthroughShader(), "screenspace"), false, sp);
-			// Usually we use a different ortho perspective, but it's messed up in this case, so we're drawing the screen upside down instead
-			FloatBuffer tf = new Matrix4f().identity().translate(xp+screen2.width*0.5f, yp+screen2.height*0.5f,1)
-				.scale(screen2.width*0.5f, -screen2.height*0.5f, 1).get(stack.mallocFloat(16));
-			glUniformMatrix4fv(glGetUniformLocation(Game.getPassthroughShader(), "transform"), false, tf);
-			glActiveTexture(GL_TEXTURE0);
-			glBindTexture(GL_TEXTURE_2D, screen2.getTexture());
-			glBindVertexArray(Game.getVao());
-			glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
-		}
+		Shader.passthrough.use();
+		Shader.passthrough.setProjection(new Matrix4f().ortho(0, width, height, 0, -1, 1));
+		Shader.passthrough.setTransform(new Matrix4f().identity()
+			.translate(xp + screen2.width*0.5f, yp + screen2.height*0.5f, 0)
+			.scale(screen2.width*0.5f, -screen2.height*0.5f, 1)); // Drawn upside down for reasons I'm still unsure of
+		Shader.passthrough.setTexture(screen2.getTexture());
+		glBindVertexArray(Game.getVao());
+		glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
 	}
 
 	/**
@@ -286,27 +263,19 @@ public class Screen {
 
 		glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
 		glViewport(0, 0, width, height);
-		try(MemoryStack stack = MemoryStack.stackPush()) {
-			glUseProgram(Game.getOverlayShader());
-			FloatBuffer sp = new Matrix4f().ortho(0, width, 0, height,-1, 1)
-				.get(stack.mallocFloat(16));
-			glUniformMatrix4fv(glGetUniformLocation(Game.getOverlayShader(), "screenspace"), false, sp);
-			FloatBuffer tf = new Matrix4f().identity().translate(width / 2.f, height / 2.f, 0)
-				.scale(width / 2.f, height / 2.f, 1).get(stack.mallocFloat(16));
-			glUniformMatrix4fv(glGetUniformLocation(Game.getOverlayShader(), "transform"), false, tf);
-			glUniform1f(glGetUniformLocation(Game.getOverlayShader(), "tintFactor"), (float) (tintFactor/255.f));
-			glUniform1i(glGetUniformLocation(Game.getOverlayShader(), "currentLevel"), currentLevel);
-			glUniform2f(glGetUniformLocation(Game.getOverlayShader(), "adjust"), xa, ya);
-			glActiveTexture(GL_TEXTURE0);
-			glBindTexture(GL_TEXTURE_2D, texture);
-			glActiveTexture(GL_TEXTURE1);
-			glBindTexture(GL_TEXTURE_2D, screen2.getTexture());
-			glActiveTexture(GL_TEXTURE2);
-			glBindTexture(GL_TEXTURE_2D, ditherTexture);
-			glActiveTexture(GL_TEXTURE0);
-			glBindVertexArray(Game.getVao());
-			glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
-		}
+		Shader.overlay.use();
+		Shader.overlay.setProjection(new Matrix4f().ortho(0, width, 0, height, -1, 1));
+		Shader.overlay.setTransform(new Matrix4f().identity()
+			.translate(width / 2.f, height / 2.f, 0)
+			.scale(width / 2.f, height / 2.f, 1));
+		Shader.overlay.setTintFactor((float)tintFactor/255.f);
+		Shader.overlay.setCurrentLevel(currentLevel);
+		Shader.overlay.setAdjust(xa, ya);
+		Shader.overlay.setTexture(texture);
+		Shader.overlay.setOverlay(screen2.getTexture());
+		Shader.overlay.setDither(ditherTexture);
+		glBindVertexArray(Game.getVao());
+		glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
 	}
 
 	private static double getTintFactor(int currentLevel) {
@@ -344,23 +313,14 @@ public class Screen {
 
 		glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
 		glViewport(0, 0, width, height);
-		glEnable(GL_BLEND);
-		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-		try(MemoryStack stack = MemoryStack.stackPush()) {
-			glUseProgram(Game.getLightingShader());
-			FloatBuffer sp = new Matrix4f().ortho(0, width, height, 0, -1, 1)
-				.get(stack.mallocFloat(16));
-			glUniformMatrix4fv(glGetUniformLocation(Game.getLightingShader(), "screenspace"), false, sp);
-			FloatBuffer tf = new Matrix4f().identity().translate(x, y, 0)
-				.scale(r, r, 1).get(stack.mallocFloat(16));
-			glUniformMatrix4fv(glGetUniformLocation(Game.getLightingShader(), "transform"), false, tf);
-			glUniform4i(glGetUniformLocation(Game.getLightingShader(), "rectangle"), x-r, y-r, x+r, y+r);
-			glUniform2i(glGetUniformLocation(Game.getLightingShader(), "screenSize"), Renderer.WIDTH, Renderer.HEIGHT);
-			glUniform1i(glGetUniformLocation(Game.getLightingShader(), "r"), r);
-			glActiveTexture(GL_TEXTURE0);
-			glBindTexture(GL_TEXTURE_2D, texture);
-			glBindVertexArray(Game.getVao());
-			glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
-		}
+		Shader.lighting.use();
+		Shader.lighting.setProjection(new Matrix4f().ortho(0, width, height, 0, -1, 1));
+		Shader.lighting.setTransform(new Matrix4f().identity().translate(x,y,0).scale(r,r,1));
+		Shader.lighting.setRectangle(x-r,y-r,x+r,y+r);
+		Shader.lighting.setScreenSize(Renderer.WIDTH, Renderer.HEIGHT);
+		Shader.lighting.setRadius(r);
+		Shader.lighting.setTexture(texture);
+		glBindVertexArray(Game.getVao());
+		glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
 	}
 }

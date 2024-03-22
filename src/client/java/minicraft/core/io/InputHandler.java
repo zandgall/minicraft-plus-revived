@@ -89,7 +89,7 @@ public class InputHandler {
 		}
 
 		// For compatibility becuase I'm lazy. :P
-		keyNames.put(GLFW_KEY_BACKSPACE, "BACKSPACE");
+//		keyNames.put(GLFW_KEY_BACKSPACE, "BACKSPACE");
 		keyNames.put(GLFW_KEY_LEFT_CONTROL, "CTRL");
 	}
 
@@ -640,15 +640,6 @@ public class InputHandler {
 		overwrite = false;
 	}
 
-	/// Event methods, many to satisfy interface requirements...
-	public void keyPressed(KeyEvent ke) {
-		toggle(ke.getExtendedKeyCode(), true);
-	}
-
-	public void keyReleased(KeyEvent ke) {
-		toggle(ke.getExtendedKeyCode(), false);
-	}
-
 	public void keyTyped(KeyEvent ke) {
 		// Stores the last character typed
 		keyTypedBuffer = String.valueOf(ke.getKeyChar());
@@ -657,6 +648,9 @@ public class InputHandler {
 	// Key pressed or released
 	public void glfwKeyCallback(long window, int key, int scancode, int action, int mods) {
 		toggle(key, action==GLFW_PRESS || action == GLFW_REPEAT);
+		// "charCallback" doesn't detect backspace and enter keys, so handle them here
+		if(key == GLFW_KEY_BACKSPACE && (action == GLFW_PRESS || action == GLFW_REPEAT))
+			keyTypedBuffer = "\b"; // Used to pop key typed
 	}
 
 	// Char typed
