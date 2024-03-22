@@ -553,7 +553,7 @@ public class InputHandler {
 		String keytext;
 
 		if (keyNames.containsKey(keycode))
-			keytext = keyNames.get(keycode);
+			keytext = keyNames.get(keycode); 
 		else {
 			Logger.tag("INPUT").error("Could not find keyname for keycode \"" + keycode + "\"");
 			return;
@@ -651,6 +651,16 @@ public class InputHandler {
 		// "charCallback" doesn't detect backspace and enter keys, so handle them here
 		if(key == GLFW_KEY_BACKSPACE && (action == GLFW_PRESS || action == GLFW_REPEAT))
 			keyTypedBuffer = "\b"; // Used to pop key typed
+	}
+
+	// Char typed
+	public void glfwCharCallback(long l, int key) {
+		keyTypedBuffer = String.valueOf((char)key);
+	}
+
+	// Key pressed or released
+	public void glfwKeyCallback(long window, int key, int scancode, int action, int mods) {
+		toggle(scancode, action==GLFW_PRESS);
 	}
 
 	// Char typed

@@ -244,6 +244,120 @@ public class Initializer extends Game {
 
 //		glfwSwapInterval(1);
 
+		glClearColor(1.0f, 0.0f, 0.0f, 0.0f);
+
+		while (!glfwWindowShouldClose(window)) {
+			long now = System.nanoTime();
+			double nsPerTick = 1E9D / Updater.normSpeed; // Nanosecs per sec divided by ticks per sec = nanosecs per tick
+			if (currentDisplay == null) nsPerTick /= Updater.gamespeed;
+			unprocessed += (now - lastTick) / nsPerTick; // Figures out the unprocessed time between now and lastTick.
+			lastTick = now;
+			while (unprocessed >= 1) { // If there is unprocessed time, then tick.
+				ticks++;
+				Updater.tick(); // Calls the tick method (in which it calls the other tick methods throughout the code.
+				unprocessed--;
+			}
+
+			now = System.nanoTime();
+			if (now >= lastRender + 1E9D / MAX_FPS / 1.01) {
+				frames++;
+				lastRender = now;
+				Renderer.render();
+			}
+
+			try {
+				long curNano = System.nanoTime();
+				long untilNextTick = (long) (lastTick + nsPerTick - curNano);
+				long untilNextFrame = (long) (lastRender + 1E9D / MAX_FPS - curNano);
+				if (untilNextTick > 1E3 && untilNextFrame > 1E3) {
+					double timeToWait = Math.min(untilNextTick, untilNextFrame) / 1.2; // in nanosecond
+					//noinspection BusyWait
+					Thread.sleep((long) Math.floor(timeToWait / 1E6), (int) ((timeToWait - Math.floor(timeToWait)) % 1E6));
+				}
+			} catch (InterruptedException ignored) {
+			}
+
+			if (System.currentTimeMillis() - lastTimer1 > 1000) { //updates every 1 second
+				long interval = System.currentTimeMillis() - lastTimer1;
+				lastTimer1 = System.currentTimeMillis(); // Adds a second to the timer
+
+				fra = (int) Math.round(frames * 1000D / interval); // Saves total frames in last second
+				tik = (int) Math.round(ticks * 1000D / interval); // Saves total ticks in last second
+				frames = 0; // Resets frames
+				ticks = 0; // Resets ticks; ie, frames and ticks only are per second
+			}
+
+			glViewport(0, 0, Renderer.getWindowSize().width, Renderer.getWindowSize().height);
+			glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+			glDisable(GL_DEPTH_TEST);
+
+			try(MemoryStack stack = MemoryStack.stackPush()) {
+				glUseProgram(shader);
+				FloatBuffer sp = new Matrix4f().ortho(0, Renderer.getWindowSize().width, Renderer.getWindowSize().height, 0,
+					-1, 1).get(stack.mallocFloat(16));
+				glUniformMatrix4fv(glGetUniformLocation(shader, "screenspace"), false, sp);
+				FloatBuffer tf = new Matrix4f().identity().translate(100, 100, 0).scale(100).get(stack.mallocFloat(16));
+				glUniformMatrix4fv(glGetUniformLocation(shader, "transform"), false, tf);
+			}
+
+			glBindVertexArray(vao);
+			glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+
+			glfwSwapBuffers(window);
+			glfwPollEvents();
+		}
+
+		glfwFreeCallbacks(window);
+		glfwDestroyWindow(window);
+		glfwTerminate();
+		glfwSetErrorCallback(null).free();
+	}
+
+	static void init() {
+		GLFWErrorCallback.createPrint(System.err).set();
+		if(!glfwInit())
+			Logging.GAMEHANDLER.error("Could not initialize GLFW", new IllegalStateException("Unable to initialize GLFW"));
+
+		glfwDefaultWindowHints();
+		glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
+		glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 6);
+		glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
+		glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE);
+
+		window = glfwCreateWindow(Renderer.getWindowSize().width, Renderer.getWindowSize().height, NAME, NULL, NULL);
+		if(window == NULL)
+			Logging.GAMEHANDLER.error("Could not create window", new RuntimeException("Unable to create window"));
+
+		glfwSetKeyCallback(window, keyCallback = new GLFWKeyCallback() {
+			@Override
+			public void invoke(long window, int key, int scancode, int action, int mods) {
+				Game.input.glfwKeyCallback(window, key, scancode, action, mods);
+			}
+		});
+
+		glfwSetCharCallback(window, charCallback = new GLFWCharCallback() {
+			@Override
+			public void invoke(long window, int key) {
+				Game.input.glfwCharCallback(window, key);
+			}
+		});
+
+		glfwSetWindowFocusCallback(window, (window, focus) -> {
+			focused = focus;
+		});
+
+		try (MemoryStack stack = stackPush()) {
+			IntBuffer pWidth = stack.mallocInt(1);
+			IntBuffer pHeight = stack.mallocInt(1);
+			glfwGetWindowSize(window, pWidth, pHeight);
+			GLFWVidMode vidmode = glfwGetVideoMode(glfwGetPrimaryMonitor());
+			glfwSetWindowPos(window, (vidmode.width() - pWidth.get(0))/2, (vidmode.height() - pHeight.get(0))/2);
+		}
+
+		glfwMakeContextCurrent(window);
+
+		glfwSwapInterval(1);
+
 		glfwShowWindow(window);
 
 		GL.createCapabilities();
