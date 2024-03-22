@@ -38,7 +38,7 @@ public class OnScreenKeyboardMenu extends Menu {
 	 */
 	@Nullable
 	public static OnScreenKeyboardMenu checkAndCreateMenu() {
-		if (Game.input.anyControllerConnected()) {
+		if (Game.input.anyControllerConnected() || !Game.input.anyControllerConnected()) {
 			return new OnScreenKeyboardMenu();
 		}
 
@@ -261,26 +261,28 @@ public class OnScreenKeyboardMenu extends Menu {
 	public void render(Screen screen) {
 		super.render(screen);
 
-		BiConsumer<Integer, Integer> colorPixel = (pos, color) -> {
+		/*BiConsumer<Integer, Integer> colorPixel = (pos, color) -> {
 			if (pos < screen.pixels.length && pos > 0)
 				screen.pixels[pos] = color;
-		};
+		};*/
 
 		Rectangle bounds = getBounds();
 		int width = bounds.getWidth();
 		int height = bounds.getHeight();
 		int renderingTop = bounds.getTop();
-		for (int x = 0; x < width; x++) { // Rendering background.
+		/*for (int x = 0; x < width; x++) { // Rendering background.
 			for (int y = 0; y < height; y++) {
 				colorPixel.accept(x + (y + renderingTop) * Screen.w, 0x1CFCFCF);
 			}
-		}
+		}*/
+		screen.render(x, y+renderingTop, width, height, 0xFFCFCFCF);
 
-		for (int x = 0; x < width; x++) { // Rendering upper edge.
+		/*for (int x = 0; x < width; x++) { // Rendering upper edge.
 			for (int y = 0; y < 2; y++) {
 				colorPixel.accept(x + (y + renderingTop) * Screen.w, 0x1EFEFEF);
 			}
-		}
+		}*/
+		screen.render(x, y+renderingTop, width, 2, 0xFFEFEFEF);
 
 		final int keyHeight = 14;
 		VirtualKey[][] keys = shiftPressed ? keysB : keysF;
@@ -301,77 +303,100 @@ public class OnScreenKeyboardMenu extends Menu {
 					keyWidth = defaultKeyWidth * 2;
 				else
 					keyWidth = defaultKeyWidth;
-				int color = keyPressed > 0 && r == this.y && c == this.x ? 0x1EFEFF0 : 0x1FDFDFD;
+				int color = keyPressed > 0 && r == this.y && c == this.x ? 0xFFEFEFF0 : 0xFFFDFDFD;
 				if (key == backspace) { // Rendering the backspace.
 					// Rendering the cross.
-					colorPixel.accept(x + 1 + keyWidth / 2 + (y + keyHeight / 2) * Screen.w, color);
+					/*colorPixel.accept(x + 1 + keyWidth / 2 + (y + keyHeight / 2) * Screen.w, color);
 					colorPixel.accept(x + 1 + keyWidth / 2 + 1 + (y + keyHeight / 2 + 1) * Screen.w, color);
 					colorPixel.accept(x + 1 + keyWidth / 2 - 1 + (y + keyHeight / 2 - 1) * Screen.w, color);
 					colorPixel.accept(x + 1 + keyWidth / 2 + 1 + (y + keyHeight / 2 - 1) * Screen.w, color);
-					colorPixel.accept(x + 1 + keyWidth / 2 - 1 + (y + keyHeight / 2 + 1) * Screen.w, color);
+					colorPixel.accept(x + 1 + keyWidth / 2 - 1 + (y + keyHeight / 2 + 1) * Screen.w, color);*/
+					screen.render(x + 1 + keyWidth / 2, y + keyHeight / 2, 1, 1, color);
+					screen.render(x + 1 + keyWidth / 2-1, y + keyHeight / 2-1, 1, 1, color);
+					screen.render(x + 1 + keyWidth / 2-1, y + keyHeight / 2+1, 1, 1, color);
+					screen.render(x + 1 + keyWidth / 2+1, y + keyHeight / 2-1, 1, 1, color);
+					screen.render(x + 1 + keyWidth / 2+1, y + keyHeight / 2+1, 1, 1, color);
 
 					// Rendering the upper base.
-					colorPixel.accept(x + 1 + keyWidth / 2 - 3 + (y + keyHeight / 2 - 3) * Screen.w, color);
+					/*colorPixel.accept(x + 1 + keyWidth / 2 - 3 + (y + keyHeight / 2 - 3) * Screen.w, color);
 					colorPixel.accept(x + 1 + keyWidth / 2 - 2 + (y + keyHeight / 2 - 3) * Screen.w, color);
 					colorPixel.accept(x + 1 + keyWidth / 2 - 1 + (y + keyHeight / 2 - 3) * Screen.w, color);
 					colorPixel.accept(x + 1 + keyWidth / 2 + (y + keyHeight / 2 - 3) * Screen.w, color);
 					colorPixel.accept(x + 1 + keyWidth / 2 + 1 + (y + keyHeight / 2 - 3) * Screen.w, color);
 					colorPixel.accept(x + 1 + keyWidth / 2 + 2 + (y + keyHeight / 2 - 3) * Screen.w, color);
-					colorPixel.accept(x + 1 + keyWidth / 2 + 3 + (y + keyHeight / 2 - 3) * Screen.w, color);
+					colorPixel.accept(x + 1 + keyWidth / 2 + 3 + (y + keyHeight / 2 - 3) * Screen.w, color);*/
+					screen.render(x + 1 + keyWidth / 2 - 3, y + keyHeight / 2 - 3, 7, 1, color);
 
 					// Rendering the lower base.
-					colorPixel.accept(x + 1 + keyWidth / 2 - 3 + (y + keyHeight / 2 + 3) * Screen.w, color);
+					/*colorPixel.accept(x + 1 + keyWidth / 2 - 3 + (y + keyHeight / 2 + 3) * Screen.w, color);
 					colorPixel.accept(x + 1 + keyWidth / 2 - 2 + (y + keyHeight / 2 + 3) * Screen.w, color);
 					colorPixel.accept(x + 1 + keyWidth / 2 - 1 + (y + keyHeight / 2 + 3) * Screen.w, color);
 					colorPixel.accept(x + 1 + keyWidth / 2 + (y + keyHeight / 2 + 3) * Screen.w, color);
 					colorPixel.accept(x + 1 + keyWidth / 2 + 1 + (y + keyHeight / 2 + 3) * Screen.w, color);
 					colorPixel.accept(x + 1 + keyWidth / 2 + 2 + (y + keyHeight / 2 + 3) * Screen.w, color);
-					colorPixel.accept(x + 1 + keyWidth / 2 + 3 + (y + keyHeight / 2 + 3) * Screen.w, color);
+					colorPixel.accept(x + 1 + keyWidth / 2 + 3 + (y + keyHeight / 2 + 3) * Screen.w, color);*/
+					screen.render(x + 1 + keyWidth / 2 - 3, y + keyHeight / 2 + 3, 7, 1, color);
 
 					// Rendering the left angle.
-					colorPixel.accept(x + 1 + keyWidth / 2 - 4 + (y + keyHeight / 2 - 2) * Screen.w, color);
+					/*colorPixel.accept(x + 1 + keyWidth / 2 - 4 + (y + keyHeight / 2 - 2) * Screen.w, color);
 					colorPixel.accept(x + 1 + keyWidth / 2 - 5 + (y + keyHeight / 2 - 1) * Screen.w, color);
 					colorPixel.accept(x + 1 + keyWidth / 2 - 6 + (y + keyHeight / 2) * Screen.w, color);
 					colorPixel.accept(x + 1 + keyWidth / 2 - 5 + (y + keyHeight / 2 + 1) * Screen.w, color);
-					colorPixel.accept(x + 1 + keyWidth / 2 - 4 + (y + keyHeight / 2 + 2) * Screen.w, color);
+					colorPixel.accept(x + 1 + keyWidth / 2 - 4 + (y + keyHeight / 2 + 2) * Screen.w, color);*/
+					screen.render(x + 1 + keyWidth / 2 - 4, y + keyHeight / 2 - 2, 1, 1, color);
+					screen.render(x + 1 + keyWidth / 2 - 5, y + keyHeight / 2 - 1, 1, 1, color);
+					screen.render(x + 1 + keyWidth / 2 - 6, y + keyHeight / 2, 1, 1, color);
+					screen.render(x + 1 + keyWidth / 2 - 5, y + keyHeight / 2 + 1, 1, 1, color);
+					screen.render(x + 1 + keyWidth / 2 - 4, y + keyHeight / 2 + 2, 1, 1, color);
 
-					colorPixel.accept(x + 1 + keyWidth / 2 + 4 + (y + keyHeight / 2 - 3) * Screen.w, color);
+					/*colorPixel.accept(x + 1 + keyWidth / 2 + 4 + (y + keyHeight / 2 - 3) * Screen.w, color);
 					colorPixel.accept(x + 1 + keyWidth / 2 + 4 + (y + keyHeight / 2 - 2) * Screen.w, color);
 					colorPixel.accept(x + 1 + keyWidth / 2 + 4 + (y + keyHeight / 2 - 1) * Screen.w, color);
 					colorPixel.accept(x + 1 + keyWidth / 2 + 4 + (y + keyHeight / 2) * Screen.w, color);
 					colorPixel.accept(x + 1 + keyWidth / 2 + 4 + (y + keyHeight / 2 + 1) * Screen.w, color);
 					colorPixel.accept(x + 1 + keyWidth / 2 + 4 + (y + keyHeight / 2 + 2) * Screen.w, color);
-					colorPixel.accept(x + 1 + keyWidth / 2 + 4 + (y + keyHeight / 2 + 3) * Screen.w, color);
+					colorPixel.accept(x + 1 + keyWidth / 2 + 4 + (y + keyHeight / 2 + 3) * Screen.w, color);*/
+					screen.render(x + 1 + keyWidth / 2 + 4, y + keyHeight / 2 - 3, 1, 7, color);
+
 				} else if (key == shiftKey) { // Rendering "SYM".
 					Font.draw("S", screen, x + keyWidth / 2 - 3 - defaultKeyWidth / 2, y + keyHeight / 2 - 3, color);
 					Font.draw("Y", screen, x + keyWidth / 2 - 3, y + keyHeight / 2 - 3, color);
 					Font.draw("M", screen, x + keyWidth / 2 - 3 + defaultKeyWidth / 2, y + keyHeight / 2 - 3, color);
 				} else if (key == spaceBar) { // Rendering "underscore".
-					for (int i = 1; i < 19; i++) {
+					/*for (int i = 1; i < 19; i++) {
 						colorPixel.accept(x + keyWidth / 2 + i - 9 + (y + keyHeight / 2 + 2) * Screen.w, color);
-					}
+					}*/
+					screen.render(x + keyWidth / 2 - 8, y + keyHeight / 2 + 2, 19, 1, color);
 				} else
 					Font.draw(String.valueOf(key.output), screen, x + keyWidth / 2 - 3, y + keyHeight / 2 - 3, color);
 
-				for (int i = 0; i <= keyHeight; i++) { // Rendering left and right border.
+				/*for (int i = 0; i <= keyHeight; i++) { // Rendering left and right border.
 					colorPixel.accept(x + (y + i) * Screen.w, 0x1BCBCBC);
 					colorPixel.accept(x + keyWidth + (y + i) * Screen.w, 0x1BCBCBC);
-				}
-				for (int i = 0; i <= keyWidth; i++) { // Rendering top and bottom border.
+				}*/
+				screen.render(x, y, 1, keyHeight, 0xFFBCBCBC);
+				screen.render(x+keyWidth, y, 1, keyHeight, 0xFFBCBCBC);
+				/*for (int i = 0; i <= keyWidth; i++) { // Rendering top and bottom border.
 					colorPixel.accept(x + i + y * Screen.w, 0x1BCBCBC);
 					colorPixel.accept(x + i + (y + keyHeight) * Screen.w, 0x1BCBCBC);
-				}
+				}*/
+				screen.render(x, y, keyWidth, 1, 0xFFBCBCBC);
+				screen.render(x+keyWidth, y, keyWidth, 1, 0xFFBCBCBC);
 
 				if (this.x == c && this.y == r) {
-					color = keyPressed > 0 ? 0x1EFEFF0 : 0x1DFDFE0;
-					for (int i = 1; i < keyHeight; i++) { // Rendering left and right border.
+					color = keyPressed > 0 ? 0xFFEFEFF0 : 0xFFDFDFE0;
+					/*for (int i = 1; i < keyHeight; i++) { // Rendering left and right border.
 						colorPixel.accept(x + 1 + (y + i) * Screen.w, color);
 						colorPixel.accept(x - 1 + keyWidth + (y + i) * Screen.w, color);
-					}
-					for (int i = 1; i < keyWidth; i++) { // Rendering top and bottom border.
+					}*/
+					screen.render(x+1, y+1, 1, keyHeight-1, color);
+					screen.render(x-1+keyWidth, y+1, 1, keyHeight-1, color);
+					/*for (int i = 1; i < keyWidth; i++) { // Rendering top and bottom border.
 						colorPixel.accept(x + i + (y + 1) * Screen.w, color);
 						colorPixel.accept(x + i + (y - 1 + keyHeight) * Screen.w, color);
-					}
+					}*/
+					screen.render(x+1, y+1, keyWidth-1, 1, color);
+					screen.render(x+1, y-1+keyHeight, keyWidth-1, 1, color);
 				}
 
 				x += keyWidth;

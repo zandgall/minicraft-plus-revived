@@ -60,8 +60,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
-import static org.lwjgl.opengl.GL30.*;
-
 public class Renderer extends Game {
 	private Renderer() {
 	}
@@ -108,11 +106,11 @@ public class Renderer extends Game {
 	}
 
 	public static void initScreen() {
-		screen = new Screen();
-		lightScreen = new Screen();
+		screen = new Screen(WIDTH, HEIGHT);
+		lightScreen = new Screen(WIDTH, HEIGHT);
 
 		image = new BufferedImage(WIDTH, HEIGHT, BufferedImage.TYPE_INT_RGB);
-		screen.pixels = ((DataBufferInt) image.getRaster().getDataBuffer()).getData();
+//		screen.pixels = ((DataBufferInt) image.getRaster().getDataBuffer()).getData();
 		hudSheet = new LinkedSprite(SpriteType.Gui, "hud");
 
 		WINDOW_SIZE = getWindowSize();
@@ -138,62 +136,38 @@ public class Renderer extends Game {
 		if (!Game.isFocused())
 			renderFocusNagger(); // Calls the renderFocusNagger() method, which creates the "Click to Focus" message.
 
-//		if (canvas == null) return;
-
-		// Scale the pixels.
-		int ww = getWindowSize().width;
-		int hh = getWindowSize().height;
-
-		// Get the image offset.
-		int xOffset = (WINDOW_SIZE.width - ww) / 2;
-		int yOffset = (WINDOW_SIZE.height - hh) / 2;
-
-//		BufferStrategy bs = canvas.getBufferStrategy(); // Creates a buffer strategy to determine how the graphics should be buffered.
-//		Graphics g = bs.getDrawGraphics(); // Gets the graphics in which java draws the picture
-//		g.fillRect(0, 0, canvas.getWidth(), canvas.getHeight()); // Draws a rect to fill the whole window (to cover last?)
-
-		// Draw the image on the window.
-//		g.drawImage(image, xOffset, yOffset, ww, hh, null);
-
-		// Release any system items that are using this method. (so we don't have crappy framerates)
-//		g.dispose();
-
-		// Make the picture visible.
-//		bs.show();
-
 		// Screen capturing.
-//		if (Updater.screenshot > 0) {
-//			new File(Game.gameDir + "/screenshots/").mkdirs();
-//			int count = 1;
-//			LocalDateTime datetime = LocalDateTime.now();
-//			String stamp = DateTimeFormatter.ofPattern("yyyy-MM-dd_HH.mm.ss").format(datetime);
-//			File file = new File(String.format("%s/screenshots/%s.png", Game.gameDir, stamp));
-//			while (file.exists()) {
-//				file = new File(String.format("%s/screenshots/%s_%s.png", Game.gameDir, stamp, count));
-//				count++;
-//			}
-//
-//			try { // https://stackoverflow.com/a/4216635
-//				int w = image.getWidth();
-//				int h = image.getHeight();
-//				BufferedImage before = new BufferedImage(w, h, BufferedImage.TYPE_INT_RGB);
+		if (Updater.screenshot > 0) {
+			new File(Game.gameDir + "/screenshots/").mkdirs();
+			int count = 1;
+			LocalDateTime datetime = LocalDateTime.now();
+			String stamp = DateTimeFormatter.ofPattern("yyyy-MM-dd_HH.mm.ss").format(datetime);
+			File file = new File(String.format("%s/screenshots/%s.png", Game.gameDir, stamp));
+			while (file.exists()) {
+				file = new File(String.format("%s/screenshots/%s_%s.png", Game.gameDir, stamp, count));
+				count++;
+			}
+
+			try { // https://stackoverflow.com/a/4216635
+				BufferedImage before = new BufferedImage(WIDTH, HEIGHT, BufferedImage.TYPE_INT_RGB);
+
 //				before.getRaster().setRect(image.getData());
-//				int scale = (Integer) Settings.get("screenshot");
-//				// BufferedImage after = BigBufferedImage.create(scale * w, scale * h, BufferedImage.TYPE_INT_RGB);
-//				AffineTransform at = new AffineTransform();
-//				at.scale(scale, scale); // Setting the scaling.
-//				AffineTransformOp scaleOp = new AffineTransformOp(at, AffineTransformOp.TYPE_NEAREST_NEIGHBOR);
-//
-//				// Use this solution without larger scales which use up a lot of memory.
-//				// With scale 20, up to around 360MB overall RAM use.
-//				BufferedImage after = scaleOp.filter(before, null);
-//				ImageIO.write(after, "png", file);
-//			} catch (IOException e) {
-//				CrashHandler.errorHandle(e);
-//			}
-//
-//			Updater.screenshot--;
-//		}
+				int scale = (Integer) Settings.get("screenshot");
+				// BufferedImage after = BigBufferedImage.create(scale * w, scale * h, BufferedImage.TYPE_INT_RGB);
+				AffineTransform at = new AffineTransform();
+				at.scale(scale, scale); // Setting the scaling.
+				AffineTransformOp scaleOp = new AffineTransformOp(at, AffineTransformOp.TYPE_NEAREST_NEIGHBOR);
+
+				// Use this solution without larger scales which use up a lot of memory.
+				// With scale 20, up to around 360MB overall RAM use.
+				BufferedImage after = scaleOp.filter(before, null);
+				ImageIO.write(after, "png", file);
+			} catch (IOException e) {
+				CrashHandler.errorHandle(e);
+			}
+
+			Updater.screenshot--;
+		}
 	}
 
 

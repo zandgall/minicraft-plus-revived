@@ -164,10 +164,15 @@ uniform bool useWhiteTint;
 uniform vec3 whiteTint;
 uniform bool useColor;
 uniform vec3 color;
+uniform bool textured;
 
 out vec4 out_color;
 
 void main() {
+	if (!textured) {
+		out_color = vec4(color, 1);
+		return;
+	}
 	vec2 nUV = uv;
 	if(mirror.x)
 		nUV.x = 1 - nUV.x;
@@ -195,6 +200,15 @@ void main() {
 		glAttachShader(defaultShader, fs);
 		glLinkProgram(defaultShader);
 		glValidateProgram(defaultShader);
+		glUseProgram(defaultShader);
+		try(MemoryStack stack = MemoryStack.stackPush()) {
+			FloatBuffer sp = new Matrix4f().ortho(0, Renderer.WIDTH, Renderer.HEIGHT, 0, -1, 1)
+				.get(stack.mallocFloat(16));
+			glUniformMatrix4fv(glGetUniformLocation(defaultShader, "screenspace"), false, sp);
+			FloatBuffer vt = new Matrix4f().identity().get(stack.mallocFloat(16));
+			glUniformMatrix4fv(glGetUniformLocation(defaultShader, "view"), false, vt);
+			glUniform1i(glGetUniformLocation(defaultShader, "texture"), 0);
+		}
 
 		glDeleteShader(fs);
 
@@ -210,7 +224,7 @@ uniform sampler2D overlay;
 uniform sampler2D dither;
 uniform float tintFactor;
 uniform int currentLevel;
-uniform ivec2 adjust;
+uniform vec2 adjust;
 
 out vec4 out_color;
 
@@ -242,6 +256,56 @@ void main() {
 		glAttachShader(overlayShader, fs);
 		glLinkProgram(overlayShader);
 		glValidateProgram(overlayShader);
+		glUseProgram(overlayShader);
+		try(MemoryStack stack = MemoryStack.stackPush()) {
+			FloatBuffer sp = new Matrix4f().ortho(0, Renderer.WIDTH, 0, Renderer.HEIGHT,-1, 1)
+				.get(stack.mallocFloat(16));
+			glUniformMatrix4fv(glGetUniformLocation(overlayShader, "screenspace"), false, sp);
+			FloatBuffer vt = new Matrix4f().identity().get(stack.mallocFloat(16));
+			glUniformMatrix4fv(glGetUniformLocation(overlayShader, "view"), false, vt);
+			glUniform1i(glGetUniformLocation(overlayShader, "texture"), 0);
+			glUniform1i(glGetUniformLocation(overlayShader, "overlay"), 1);
+			glUniform1i(glGetUniformLocation(overlayShader, "dither"), 2);
+		}
+
+		glDeleteShader(fs);
+
+		passthroughShader = glCreateProgram();
+		fs = glCreateShader(GL_FRAGMENT_SHADER);
+		glShaderSource(fs, """
+#version 330 core
+
+in vec2 uv;
+
+uniform sampler2D texture;
+
+out vec4 out_color;
+
+void main() {
+	out_color = texture2D(texture, uv);
+}""");
+		glCompileShader(fs);
+		glGetShaderiv(fs, GL_COMPILE_STATUS, result);
+		if(result[0] == GL_FALSE) {
+			System.out.println(glGetShaderInfoLog(fs));
+			glDeleteShader(fs);
+		}
+
+		glAttachShader(passthroughShader, vs);
+		glAttachShader(passthroughShader, fs);
+		glLinkProgram(passthroughShader);
+		glValidateProgram(passthroughShader);
+		glUseProgram(passthroughShader);
+		try(MemoryStack stack = MemoryStack.stackPush()) {
+			FloatBuffer sp = new Matrix4f().ortho(0, Renderer.WIDTH, 0, Renderer.HEIGHT,-1, 1)
+				.get(stack.mallocFloat(16));
+			glUniformMatrix4fv(glGetUniformLocation(passthroughShader, "screenspace"), false, sp);
+			FloatBuffer vt = new Matrix4f().identity().get(stack.mallocFloat(16));
+			glUniformMatrix4fv(glGetUniformLocation(passthroughShader, "view"), false, vt);
+			glUniform1i(glGetUniformLocation(passthroughShader, "texture"), 0);
+			glUniform1i(glGetUniformLocation(passthroughShader, "overlay"), 1);
+			glUniform1i(glGetUniformLocation(passthroughShader, "dither"), 2);
+		}
 
 		glDeleteShader(fs);
 
@@ -270,6 +334,15 @@ void main() {
 		glAttachShader(postprocessShader, fs);
 		glLinkProgram(postprocessShader);
 		glValidateProgram(postprocessShader);
+		glUseProgram(postprocessShader);
+		try(MemoryStack stack = MemoryStack.stackPush()) {
+			FloatBuffer sp = new Matrix4f().ortho(0, Renderer.WIDTH, 0, Renderer.HEIGHT, -1, 1)
+				.get(stack.mallocFloat(16));
+			glUniformMatrix4fv(glGetUniformLocation(postprocessShader, "screenspace"), false, sp);
+			FloatBuffer vt = new Matrix4f().identity().get(stack.mallocFloat(16));
+			glUniformMatrix4fv(glGetUniformLocation(postprocessShader, "view"), false, vt);
+			glUniform1i(glGetUniformLocation(postprocessShader, "texture"), 0);
+		}
 
 		glDeleteShader(fs);
 
@@ -290,11 +363,9 @@ out vec4 out_color;
 void main() {
 	vec2 p = (uv-vec2(0.5))*(rectangle.zw-rectangle.xy);
 	float dist = p.x*p.x + p.y*p.y;
-	float br = 255 - dist * 255 / (r * r);
-	vec2 pUV = (uv * (rectangle.zw-rectangle.xy) + rectangle.xy) / screenSize;
-	if(texture2D(texture, pUV).x >= br)
-		discard;
-	out_color = vec4(br/255.f, 0, 0, 1);
+	float br = 1 - dist / (r * r);
+//	vec2 pUV = (uv * (rectangle.zw-rectangle.xy) + rectangle.xy) / screenSize;
+	out_color = vec4(1, 0, 0, br);
 }""");
 		glCompileShader(fs);
 		glGetShaderiv(fs, GL_COMPILE_STATUS, result);
@@ -307,6 +378,15 @@ void main() {
 		glAttachShader(lightingShader, fs);
 		glLinkProgram(lightingShader);
 		glValidateProgram(lightingShader);
+		glUseProgram(lightingShader);
+		try(MemoryStack stack = MemoryStack.stackPush()) {
+			FloatBuffer sp = new Matrix4f().ortho(0, Renderer.WIDTH, Renderer.HEIGHT, 0, -1, 1)
+				.get(stack.mallocFloat(16));
+			glUniformMatrix4fv(glGetUniformLocation(lightingShader, "screenspace"), false, sp);
+			FloatBuffer vt = new Matrix4f().identity().get(stack.mallocFloat(16));
+			glUniformMatrix4fv(glGetUniformLocation(lightingShader, "view"), false, vt);
+			glUniform1i(glGetUniformLocation(lightingShader, "texture"), 0);
+		}
 
 		glDeleteShader(fs);
 
@@ -333,39 +413,19 @@ void main() {
 			if (now >= lastRender + 1E9D / MAX_FPS / 1.01) {
 				frames++;
 				lastRender = now;
-				try(MemoryStack stack = MemoryStack.stackPush()) {
-					glUseProgram(defaultShader);
-					FloatBuffer sp = new Matrix4f().ortho(0, Renderer.WIDTH, Renderer.HEIGHT, 0, -1, 1)
-						.get(stack.mallocFloat(16));
-					glUniformMatrix4fv(glGetUniformLocation(defaultShader, "screenspace"), false, sp);
-					FloatBuffer vt = new Matrix4f().identity().get(stack.mallocFloat(16));
-					glUniformMatrix4fv(glGetUniformLocation(defaultShader, "view"), false, vt);
-					glUniform1i(glGetUniformLocation(defaultShader, "texture"), 0);
-					glActiveTexture(GL_TEXTURE0);
-					glBindVertexArray(vao);
-				}
 				Renderer.render();
 				try(MemoryStack stack = MemoryStack.stackPush()) {
 					glBindFramebuffer(GL_FRAMEBUFFER, 0);
 					glViewport(0, 0, WINDOW_SIZE.width, WINDOW_SIZE.height);
 					glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 					glUseProgram(postprocessShader);
-					FloatBuffer sp = new Matrix4f().ortho(0, Renderer.WIDTH, 0, Renderer.HEIGHT,-1, 1)
-						.get(stack.mallocFloat(16));
-					glUniformMatrix4fv(glGetUniformLocation(defaultShader, "screenspace"), false, sp);
-					FloatBuffer vt = new Matrix4f().identity().get(stack.mallocFloat(16));
-					glUniformMatrix4fv(glGetUniformLocation(defaultShader, "view"), false, vt);
 					FloatBuffer tf = new Matrix4f().identity().translate(Renderer.WIDTH/2.f, Renderer.HEIGHT/2.f,0).scale(Renderer.WIDTH/2.f, Renderer.HEIGHT/2.f, 1).get(stack.mallocFloat(16));
 					glUniformMatrix4fv(glGetUniformLocation(defaultShader, "transform"), false, tf);
-					glUniform1i(glGetUniformLocation(defaultShader, "texture"), 0);
 					glActiveTexture(GL_TEXTURE0);
 					glBindVertexArray(vao);
 					glBindTexture(GL_TEXTURE_2D, screen.getTexture());
 					glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
 				}
-//				glBindFramebuffer(GL_READ_FRAMEBUFFER, screen.getFramebuffer());
-//				glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
-//				glBlitFramebuffer(0, 0, Renderer.WIDTH, Renderer.HEIGHT, 0, 0, WINDOW_SIZE.width, WINDOW_SIZE.height, GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT, GL_NEAREST);
 				glfwSwapBuffers(window);
 			}
 
@@ -461,61 +521,6 @@ void main() {
 		glfwShowWindow(window);
 
 		GL.createCapabilities();
-	}
-
-	// Creates and displays the JFrame window that the game appears in.
-	static void createAndDisplayFrame() {
-//		Renderer.canvas.setMinimumSize(new java.awt.Dimension(1, 1));
-//		Renderer.canvas.setPreferredSize(Renderer.getWindowSize());
-//		Renderer.canvas.setBackground(Color.BLACK);
-//		JFrame frame = Initializer.frame = new JFrame(NAME);
-//		frame.setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
-//		frame.setLayout(new BorderLayout()); // Sets the layout of the window
-//		frame.add(Renderer.canvas, BorderLayout.CENTER); // Adds the game (which is a canvas) to the center of the screen.
-//		frame.pack(); // Squishes everything into the preferredSize.
-
-//		try {
-//			BufferedImage logo = ImageIO.read(Game.class.getResourceAsStream("/resources/logo.png")); // Load the window logo
-//			frame.setIconImage(logo);
-//		} catch (IOException e) {
-//			CrashHandler.errorHandle(e);
-//		}
-
-//		frame.setLocationRelativeTo(null); // The window will pop up in the middle of the screen when launched.
-
-//		frame.addComponentListener(new ComponentAdapter() {
-//			public void componentResized(ComponentEvent e) {
-//				float w = frame.getWidth() - frame.getInsets().left - frame.getInsets().right;
-//				float h = frame.getHeight() - frame.getInsets().top - frame.getInsets().bottom;
-//				Renderer.SCALE = Math.min(w / Renderer.WIDTH, h / Renderer.HEIGHT);
-//			}
-//		});
-
-//		frame.addWindowListener(new WindowListener() {
-//			public void windowActivated(WindowEvent e) {
-//			}
-//
-//			public void windowDeactivated(WindowEvent e) {
-//			}
-//
-//			public void windowIconified(WindowEvent e) {
-//			}
-//
-//			public void windowDeiconified(WindowEvent e) {
-//			}
-//
-//			public void windowOpened(WindowEvent e) {
-//			}
-//
-//			public void windowClosed(WindowEvent e) {
-//				Logging.GAMEHANDLER.debug("Window closed");
-//			}
-//
-//			public void windowClosing(WindowEvent e) {
-//				Logging.GAMEHANDLER.info("Window closing");
-//				quit();
-//			}
-//		});
 	}
 
 	/**

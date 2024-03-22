@@ -24,6 +24,7 @@ import minicraft.util.Quest;
 import minicraft.util.Quest.QuestSeries;
 import org.json.JSONArray;
 import org.json.JSONObject;
+import org.lwjgl.system.MemoryStack;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -300,17 +301,21 @@ public class QuestsDisplay extends Display {
 			private final int rasterHeight;
 			private final int rasterX;
 			private final int rasterY;
-			private final int[] rasterPixels;
-			private final Screen simulatedRasterScreen = new Screen() {
-				@Override
+			private final Screen simulatedRasterScreen;
+				/*@Override
 				public void render(int xp, int yp, int xt, int yt, int bits, MinicraftImage sheet, int whiteTint, boolean fullbright, int color) {
 					if (sheet == null) return; // Verifying that sheet is not null.
 					// Ignoring mirror.
 					// Validation check
-					if (xt * 8 + yt * 8 * sheet.width + 7 + 7 * sheet.width >= sheet.pixels.length) {
+//					if (xt * 8 + yt * 8 * sheet.width + 7 + 7 * sheet.width >= sheet.pixels.length) {
+					if (xt * 8 >= sheet.width || yt * 8 >= sheet.height) {
 						sheet = Renderer.spriteLinker.missingSheet(SpriteLinker.SpriteType.Item);
 						xt = 0;
 						yt = 0;
+					}
+
+					try(MemoryStack stack = MemoryStack.stackPush()) {
+
 					}
 
 					int xTile = xt; // Gets x position of the spritesheet "tile"
@@ -341,8 +346,7 @@ public class QuestsDisplay extends Display {
 							}
 						}
 					}
-				}
-			};
+				}*/
 
 			private int cursorX = 0;
 			private int cursorY = 0;
@@ -362,7 +366,7 @@ public class QuestsDisplay extends Display {
 						.createMenu()
 				};
 
-				Map<String, Quest> quests = series.getSeriesQuests()
+                Map<String, Quest> quests = series.getSeriesQuests()
 					.entrySet().stream().filter(entry -> entry.getValue().isUnlocked()) // Showing unlocked only.
 					.collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
 				if (!quests.isEmpty()) {
@@ -419,7 +423,7 @@ public class QuestsDisplay extends Display {
 				Rectangle menuBounds = menus[1].getBounds();
 				rasterWidth = menuBounds.getWidth() - MinicraftImage.boxWidth * 2;
 				rasterHeight = menuBounds.getHeight() - MinicraftImage.boxWidth * 2;
-				rasterPixels = new int[rasterWidth * rasterHeight];
+				this.simulatedRasterScreen = new Screen(rasterWidth, rasterHeight);;
 				rasterX = menuBounds.getLeft() + MinicraftImage.boxWidth;
 				rasterY = menuBounds.getTop() + MinicraftImage.boxWidth;
 			}
@@ -497,11 +501,12 @@ public class QuestsDisplay extends Display {
 				super.render(screen);
 				for (Menu menu : menus)
 					menu.render(screen);
-				Arrays.fill(rasterPixels, Color.BLACK);
+//				Arrays.fill(rasterPixels, Color.BLACK);
+				simulatedRasterScreen.clear(Color.BLACK | 0xFF000000);
 				renderRaster();
 				final int xPadding = rasterX - 1;
 				final int yPadding = rasterY - 1;
-				for (int i = 0; i < rasterWidth + 2; i++) {
+				/*for (int i = 0; i < rasterWidth + 2; i++) {
 					for (int j = 0; j < rasterHeight + 2; j++) {
 						final int pos = xPadding + i + (yPadding + j) * Screen.w;
 						if (i == 0 || i == rasterWidth + 1 || j == 0 || j == rasterHeight + 1)
@@ -512,7 +517,12 @@ public class QuestsDisplay extends Display {
 							screen.pixels[pos] = rasterPixels[x + y * rasterWidth];
 						}
 					}
-				}
+				}*/
+				screen.render(rasterX, rasterY, simulatedRasterScreen);
+				screen.render(xPadding, yPadding, rasterWidth, 1, Color.WHITE);
+				screen.render(xPadding, yPadding+rasterHeight, rasterWidth, 1, Color.WHITE);
+				screen.render(xPadding, yPadding, 1, rasterHeight, Color.WHITE);
+				screen.render(xPadding+rasterWidth, yPadding, 1, rasterHeight+1, Color.WHITE);
 			}
 
 			private void renderRaster() {
@@ -552,10 +562,10 @@ public class QuestsDisplay extends Display {
 						// Parent is always higher than this.
 						Point p0 = parentRec.getCenter();
 						Point p1 = rec.getCenter();
-						int x0 = p0.x;
-						int x1 = p1.x;
-						int y0 = p0.y;
-						int y1 = p1.y;
+						int x0 = p0.x - xScroll;
+						int x1 = p1.x - xScroll;
+						int y0 = p0.y - yScroll;
+						int y1 = p1.y - yScroll;
 						boolean selected = c == cursorX && r == cursorY;
 						boolean parentSelected = parentX == cursorX && parentY == cursorY;
 						int color = selected ? Color.CYAN : parentSelected ? Color.GREEN : Color.tint(Color.GRAY, -1, true);
@@ -574,27 +584,33 @@ public class QuestsDisplay extends Display {
 						int x = rec.getLeft();
 						int y = rec.getTop();
 						boolean selected = c == cursorX && r == cursorY;
-						Font.draw(Localization.getLocalized(quest.key), simulatedRasterScreen, x + entryPadding, y + entryPadding,
+						Font.draw(Localization.getLocalized(quest.key), simulatedRasterScreen, x + entryPadding - xScroll, y + entryPadding - yScroll,
 							selected ? (quest.isCompleted() ? Color.tint(Color.GREEN, 1, true) :
 								Color.WHITE) : Color.tint(Color.GRAY, 1, true));
-						for (int i = 0; i < rec.getWidth(); i++) { // Border.
+						/*for (int i = 0; i < rec.getWidth(); i++) { // Border.
 							for (int j = 0; j < rec.getHeight(); j++) {
 								if (i == 0 || i == rec.getWidth() - 1 || j == 0 || j == rec.getHeight() - 1)
 									renderRasterPixel(x + i, y + j,
 										selected ? (quest.isCompleted() ? Color.tint(Color.GREEN, -1, true) :
 											Color.tint(Color.GRAY, 2, true)) : Color.GRAY);
 							}
-						}
+						}*/
+						int color = selected ? (quest.isCompleted() ? Color.tint(Color.GREEN, -1, true) :
+							Color.tint(Color.GRAY, 2, true)) : Color.GRAY;
+						simulatedRasterScreen.render(x - xScroll, y - yScroll, rec.getWidth(), 1, color);
+						simulatedRasterScreen.render(x - xScroll, y+rec.getHeight() - yScroll, rec.getWidth(), 1, color);
+						simulatedRasterScreen.render(x - xScroll, y - yScroll, 1, rec.getHeight(), color);
+						simulatedRasterScreen.render(x+rec.getWidth() - xScroll, y - yScroll, 1, rec.getHeight()+1, color);
 					}
 				}
 			}
 
-			private void renderRasterPixel(int x, int y, int color) {
+			/*private void renderRasterPixel(int x, int y, int color) {
 				x -= xScroll;
 				y -= yScroll;
 				if (x < 0 || x >= rasterWidth || y < 0 || y >= rasterHeight) return; // Out of bounds.
 				rasterPixels[x + y * rasterWidth] = color;
-			}
+			}*/
 
 			// Parts of Bresenham's line algorithm
 			void plotLineLow(int x0, int y0, int x1, int y1, IntPredicate yRange, int color) {
@@ -609,7 +625,7 @@ public class QuestsDisplay extends Display {
 				int y = y0;
 
 				for (int x = x0; x <= x1; x++) {
-					if (yRange.test(y)) renderRasterPixel(x, y, color);
+					if (yRange.test(y)) simulatedRasterScreen.render(x, y, 1, 1, color); /*renderRasterPixel(x, y, color);*/
 					if (D > 0) {
 						y = y + yi;
 						D = D + (2 * (dy - dx));
@@ -630,7 +646,7 @@ public class QuestsDisplay extends Display {
 				int x = x0;
 
 				for (int y = y0; y <= y1; y++) {
-					if (yRange.test(y)) renderRasterPixel(x, y, color);
+					if (yRange.test(y)) simulatedRasterScreen.render(x, y, 1, 1, color); //renderRasterPixel(x, y, color);
 					if (D > 0) {
 						x = x + xi;
 						D = D + (2 * (dx - dy));

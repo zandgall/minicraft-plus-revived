@@ -19,9 +19,7 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.List;
 
-import static org.lwjgl.glfw.GLFW.GLFW_TRUE;
 import static org.lwjgl.glfw.GLFW.glfwSetWindowShouldClose;
-import static org.lwjgl.glfw.GLFW.glfwWindowShouldClose;
 
 public class Game {
 	protected Game() {
@@ -44,12 +42,13 @@ public class Game {
 	}
 
 	static long window;
-	static int vao, defaultShader, overlayShader, postprocessShader, lightingShader;
+	static int vao, defaultShader, overlayShader, postprocessShader, lightingShader, passthroughShader;
 	public static int getVao() {return vao;}
 	public static int getDefaultShader() {return defaultShader;}
 	public static int getOverlayShader() {return overlayShader;}
 	public static int getPostprocessShader() {return postprocessShader;}
 	public static int getLightingShader() {return lightingShader;}
+	public static int getPassthroughShader() {return passthroughShader;}
 	public static long getWindow() {return window;}
 
 	// DISPLAY
@@ -126,9 +125,6 @@ public class Game {
 		ResourcePackDisplay.reloadResources();
 
 		Tiles.initTileList();
-
-		// Load the selected language.
-		Initializer.createAndDisplayFrame();
 
 		setDisplay(new TitleDisplay()); // Sets menu to the title screen.
 
