@@ -16,8 +16,11 @@ import minicraft.screen.TutorialDisplayHandler;
 import minicraft.screen.WorldSelectDisplay;
 import minicraft.util.AdvancementElement;
 import minicraft.util.Logging;
+import org.lwjgl.glfw.GLFWVidMode;
 
 import java.awt.GraphicsDevice;
+
+import static org.lwjgl.glfw.GLFW.*;
 
 public class Updater extends Game {
 	private Updater() {
@@ -56,6 +59,8 @@ public class Updater extends Game {
 	public static int savecooldown; // Prevents saving many times too fast, I think.
 	public static int screenshot = 0; // Counter for screenshot queries.
 
+	public static int savedX, savedY, savedW, savedH;
+
 	public enum Time {
 		Morning(0),
 		Day(dayLength / 4),
@@ -71,21 +76,32 @@ public class Updater extends Game {
 
 	static void updateFullscreen() {
 		// Dispose is needed to set undecorated value
-		Initializer.frame.dispose();
+//		Initializer.frame.dispose();
 
-		GraphicsDevice device = Initializer.frame.getGraphicsConfiguration().getDevice();
+//		GraphicsDevice device = Initializer.frame.getGraphicsConfiguration().getDevice();
 		if (Updater.FULLSCREEN) {
-			Initializer.frame.setUndecorated(true);
-			device.setFullScreenWindow(Initializer.frame);
+//			Initializer.frame.setUndecorated(true);
+//			device.setFullScreenWindow(Initializer.frame);
+			long monitor = glfwGetPrimaryMonitor();
+			GLFWVidMode mode = glfwGetVideoMode(monitor);
+			int[] resultA = new int[1], resultB = new int[1];
+			glfwGetWindowSize(Game.getWindow(), resultA, resultB);
+			savedW = resultA[0];
+			savedH = resultB[0];
+			glfwGetWindowPos(Game.getWindow(), resultA, resultB);
+			savedX = resultA[0];
+			savedY = resultB[0];
+			glfwSetWindowMonitor(Game.getWindow(), monitor, 0, 0, mode.width(), mode.height(), mode.refreshRate());
 		} else {
-			Initializer.frame.setUndecorated(false);
-			device.setFullScreenWindow(null);
+//			Initializer.frame.setUndecorated(false);
+//			device.setFullScreenWindow(null);
+			glfwSetWindowMonitor(Game.getWindow(), 0, savedX, savedY, savedW, savedH, 0);
 		}
 
 		// Show frame again
-		Initializer.frame.setVisible(true);
+//		Initializer.frame.setVisible(true);
 		// When fullscreen is enabled, focus is lost
-		Renderer.canvas.requestFocus();
+//		Renderer.canvas.requestFocus();
 	}
 
 	// VERY IMPORTANT METHOD!! Makes everything keep happening.

@@ -52,6 +52,7 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.FloatBuffer;
+import java.nio.IntBuffer;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
@@ -59,6 +60,8 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+
+import static org.lwjgl.opengl.GL30.*;
 
 public class Renderer extends Game {
 	private Renderer() {
@@ -72,10 +75,6 @@ public class Renderer extends Game {
 
 	public static Screen screen; // Creates the main screen
 	public static SpriteLinker spriteLinker = new SpriteLinker(); // The sprite linker for sprites
-
-//	static Canvas canvas = new Canvas();
-	static Canvas canvas = null;
-	private static BufferedImage image; // Creates an image to be displayed on the screen.
 	private static Screen lightScreen; // Creates a front screen to render the darkness in caves (Fog of war).
 
 	public static boolean readyToRenderGameplay = false;
@@ -109,7 +108,7 @@ public class Renderer extends Game {
 		screen = new Screen(WIDTH, HEIGHT);
 		lightScreen = new Screen(WIDTH, HEIGHT);
 
-		image = new BufferedImage(WIDTH, HEIGHT, BufferedImage.TYPE_INT_RGB);
+//		image = new BufferedImage(WIDTH, HEIGHT, BufferedImage.TYPE_INT_RGB);
 //		screen.pixels = ((DataBufferInt) image.getRaster().getDataBuffer()).getData();
 		hudSheet = new LinkedSprite(SpriteType.Gui, "hud");
 
@@ -150,12 +149,20 @@ public class Renderer extends Game {
 
 			try { // https://stackoverflow.com/a/4216635
 				BufferedImage before = new BufferedImage(WIDTH, HEIGHT, BufferedImage.TYPE_INT_RGB);
+				ByteBuffer buffer = BufferUtils.createByteBuffer(WIDTH*HEIGHT*3);
+				glBindTexture(GL_TEXTURE_2D, screen.getTexture());
+				glGetTexImage(GL_TEXTURE_2D, 0, GL_RGB, GL_UNSIGNED_BYTE, buffer);
+				int[] rgb = new int[WIDTH*HEIGHT];
+				for(int i = 0; i < WIDTH * HEIGHT; i++) {
+					rgb[i] = ((((int)buffer.get(i*3))<<16) + (((int)buffer.get(i*3+1))<<8)+(int)buffer.get(i*3+2));
+				}
+				before.setRGB(0, 0, WIDTH, HEIGHT, rgb, 0, WIDTH);
 
 //				before.getRaster().setRect(image.getData());
 				int scale = (Integer) Settings.get("screenshot");
 				// BufferedImage after = BigBufferedImage.create(scale * w, scale * h, BufferedImage.TYPE_INT_RGB);
-				AffineTransform at = new AffineTransform();
-				at.scale(scale, scale); // Setting the scaling.
+				AffineTransform at = AffineTransform.getScaleInstance(scale, -scale); // Setting the scaling.
+				at.translate(0, -HEIGHT); // Image is upside down at first, so scale -y and translate
 				AffineTransformOp scaleOp = new AffineTransformOp(at, AffineTransformOp.TYPE_NEAREST_NEIGHBOR);
 
 				// Use this solution without larger scales which use up a lot of memory.

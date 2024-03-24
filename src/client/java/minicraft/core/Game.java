@@ -134,7 +134,6 @@ public class Game {
 		if (Updater.FULLSCREEN) {
 			Updater.updateFullscreen();
 		}
-		Initializer.launchWindow();
 		// Actually start the game.
 		Initializer.run();
 

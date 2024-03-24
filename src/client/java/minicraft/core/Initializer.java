@@ -7,14 +7,19 @@ import minicraft.util.Logging;
 import minicraft.util.TinylogLoggingProvider;
 import org.jetbrains.annotations.Nullable;
 import org.joml.Matrix4f;
+import org.lwjgl.BufferUtils;
 import org.tinylog.provider.ProviderRegistry;
 
 import org.lwjgl.glfw.*;
 import org.lwjgl.opengl.*;
 import org.lwjgl.system.*;
 
+import javax.imageio.ImageIO;
 import javax.swing.JFrame;
 
+import java.awt.image.BufferedImage;
+import java.awt.image.DataBufferByte;
+import java.io.IOException;
 import java.nio.*;
 
 import static minicraft.core.Renderer.WINDOW_SIZE;
@@ -38,19 +43,7 @@ public class Initializer extends Game {
 	private static GLFWKeyCallback keyCallback;
 	private static GLFWCharCallback charCallback;
 
-	/**
-	 * Reference to actual frame, also it may be null.
-	 */
-	static JFrame frame;
 	static int fra, tik; // These store the number of frames and ticks in the previous second; used for fps, at least.
-
-	public static JFrame getFrame() {
-		return frame;
-	}
-
-	public static int getCurFps() {
-		return fra;
-	}
 
 	static void parseArgs(String[] args) {
 		// Parses command line arguments
@@ -153,11 +146,18 @@ public class Initializer extends Game {
 				glViewport(0, 0, WINDOW_SIZE.width, WINDOW_SIZE.height);
 				glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
+				float stretchWidth = (float)WINDOW_SIZE.width / Renderer.WIDTH;
+				float stretchHeight = (float)WINDOW_SIZE.height / Renderer.HEIGHT;
+				float scale = Math.min(stretchWidth, stretchHeight);
+
 				Shader.postprocess.use();
+				Shader.postprocess.setProjection(
+					new Matrix4f().ortho(0, WINDOW_SIZE.width, 0, WINDOW_SIZE.height, -1, 1)
+				);
 				Shader.postprocess.setTransform(
 					new Matrix4f().identity()
-						.translate(Renderer.WIDTH/2.f, Renderer.HEIGHT/2.f,0)
-						.scale(Renderer.WIDTH/2.f, Renderer.HEIGHT/2.f, 1)
+						.translate(WINDOW_SIZE.width/2.f, WINDOW_SIZE.height/2.f,0)
+						.scale(Renderer.WIDTH*scale*0.5f, Renderer.HEIGHT*scale*0.5f, 1)
 				);
 				Shader.postprocess.setTexture(screen.getTexture());
 				glBindVertexArray(vao);
@@ -226,6 +226,10 @@ public class Initializer extends Game {
 			}
 		});
 
+		glfwSetFramebufferSizeCallback(window, (window, width, height) -> {
+			WINDOW_SIZE.setSize(width, height);
+		});
+
 		glfwSetWindowFocusCallback(window, (window, focus) -> {
 			focused = focus;
 		});
@@ -240,20 +244,33 @@ public class Initializer extends Game {
 
 		glfwMakeContextCurrent(window);
 
-		glfwSwapInterval(1);
+		try {
+			BufferedImage logo = ImageIO.read(Game.class.getResourceAsStream("/resources/logo.png")); // Load the window logo
+			byte[] pixels = ((DataBufferByte)logo.getRaster().getDataBuffer()).getData();
+			ByteBuffer buffer = BufferUtils.createByteBuffer(pixels.length);
+			buffer.order(ByteOrder.nativeOrder());
+			// pixels is in ABGR order, when we need RGBA order
+			for(int i = 0; i < pixels.length; i+=4) {
+				buffer.put(pixels[i + 3]);
+				buffer.put(pixels[i + 2]);
+				buffer.put(pixels[i + 1]);
+				buffer.put(pixels[i + 0]);
+			}
+
+			buffer.flip();
+			GLFWImage.Buffer gb = GLFWImage.create(1);
+			GLFWImage glfwImage = GLFWImage.create().set(logo.getWidth(), logo.getHeight(), buffer);
+			gb.put(0, glfwImage);
+			glfwSetWindowIcon(window, gb);
+		} catch (IOException e) {
+			CrashHandler.errorHandle(e);
+		}
+
+		glfwSwapInterval(0);
 
 		glfwShowWindow(window);
 
 		GL.createCapabilities();
-	}
-
-	/**
-	 * Launching the main window.
-	 */
-	static void launchWindow() {
-//		frame.setVisible(true);
-//		frame.requestFocus();
-//		Renderer.canvas.requestFocus();
 	}
 
 	/**

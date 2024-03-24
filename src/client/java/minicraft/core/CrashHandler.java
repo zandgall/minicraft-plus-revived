@@ -19,10 +19,7 @@ import javax.swing.JTextArea;
 import javax.swing.UIManager;
 import javax.swing.WindowConstants;
 
-import java.awt.BorderLayout;
-import java.awt.Font;
-import java.awt.GraphicsEnvironment;
-import java.awt.GridBagLayout;
+import java.awt.*;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.util.concurrent.Future;
@@ -60,7 +57,7 @@ public class CrashHandler {
 
 		Logging.CRASHHANDLER.error("Crash: " + info.type.name + ": " + info.title + (info.message != null ? ": " + info.message : ""));
 
-		JDialog dialog = new JDialog(Initializer.frame, "Crash: " + info.type.name, true); // Displays the error type.
+		JDialog dialog = new JDialog((Frame) null, "Crash: " + info.type.name, true); // Displays the error type.
 
 		JLabel icon = new JLabel(UIManager.getIcon(info.serious ? "OptionPane.errorIcon" : "OptionPane.warningIcon"));
 		icon.setBorder(BorderFactory.createEmptyBorder(8, 8, 8, 8));
@@ -143,7 +140,7 @@ public class CrashHandler {
 
 		Logging.CRASHHANDLER.error(info.type.name + ": " + info.title + (info.message != null ? ": " + info.message : ""));
 
-		JDialog dialog = new JDialog(Initializer.frame, "Error: " + info.type.name, true); // Displays the error type.
+		JDialog dialog = new JDialog((Frame) null, "Error: " + info.type.name, true); // Displays the error type.
 
 		// Sets the icon depends on the error type.
 		JLabel icon = new JLabel(info.serious ? UIManager.getIcon("OptionPane.errorIcon") : info.type == ErrorType.REPORT ? UIManager.getIcon("OptionPane.informationIcon") : UIManager.getIcon("OptionPane.warningIcon"));
