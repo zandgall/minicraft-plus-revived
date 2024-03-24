@@ -2,6 +2,7 @@ package minicraft.core;
 
 import minicraft.core.io.FileHandler;
 import minicraft.core.io.Localization;
+import minicraft.core.io.Settings;
 import minicraft.core.io.Shader;
 import minicraft.util.Logging;
 import minicraft.util.TinylogLoggingProvider;
@@ -266,7 +267,7 @@ public class Initializer extends Game {
 			CrashHandler.errorHandle(e);
 		}
 
-		glfwSwapInterval(0);
+		glfwSwapInterval((boolean)Settings.get("vsync") ? 1 : 0);
 
 		glfwShowWindow(window);
 

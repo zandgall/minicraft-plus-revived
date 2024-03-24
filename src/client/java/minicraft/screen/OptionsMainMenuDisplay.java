@@ -5,12 +5,15 @@ import minicraft.core.io.Settings;
 import minicraft.saveload.Save;
 import minicraft.screen.entry.SelectEntry;
 
+import static org.lwjgl.glfw.GLFW.glfwSwapInterval;
+
 public class OptionsMainMenuDisplay extends Display {
 
 	public OptionsMainMenuDisplay() {
 		super(true, new Menu.Builder(false, 6, RelPos.LEFT,
 			Settings.getEntry("fps"),
 			Settings.getEntry("sound"),
+			Settings.getEntry("vsync"),
 			Settings.getEntry("showquests"),
 			new SelectEntry("minicraft.display.options_display.change_key_bindings", () -> Game.setDisplay(new KeyInputDisplay())),
 			new SelectEntry("minicraft.displays.controls", () -> Game.setDisplay(new ControlsDisplay())),
@@ -26,5 +29,6 @@ public class OptionsMainMenuDisplay extends Display {
 	public void onExit() {
 		new Save();
 		Game.MAX_FPS = (int) Settings.get("fps");
+		glfwSwapInterval((boolean)Settings.get("vsync") ? 1 : 0);
 	}
 }

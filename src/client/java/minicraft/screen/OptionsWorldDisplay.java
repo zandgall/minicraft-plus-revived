@@ -14,6 +14,8 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.Executors;
 
+import static org.lwjgl.glfw.GLFW.glfwSwapInterval;
+
 public class OptionsWorldDisplay extends Display {
 	public OptionsWorldDisplay() {
 		super(true);
@@ -62,6 +64,7 @@ public class OptionsWorldDisplay extends Display {
 			Settings.getEntry("fps"),
 			Settings.getEntry("sound"),
 			Settings.getEntry("autosave"),
+			Settings.getEntry("vsync"),
 			new SelectEntry("minicraft.display.options_display.change_key_bindings", () -> Game.setDisplay(new KeyInputDisplay())),
 			new SelectEntry("minicraft.displays.controls", () -> Game.setDisplay(new ControlsDisplay())),
 			new SelectEntry("minicraft.display.options_display.language", () -> Game.setDisplay(new LanguageSettingsDisplay())),
@@ -74,5 +77,6 @@ public class OptionsWorldDisplay extends Display {
 	public void onExit() {
 		new Save();
 		Game.MAX_FPS = (int) Settings.get("fps");
+		glfwSwapInterval((boolean)Settings.get("vsync") ? 1 : 0);
 	}
 }

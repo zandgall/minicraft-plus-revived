@@ -304,6 +304,7 @@
   "minicraft.settings.screenshot_scale": "Screenshot Scale",
   "minicraft.settings.sound": "Sound",
   "minicraft.settings.autosave": "Autosave",
+  "minicraft.settings.vsync": "VSync",
   "minicraft.settings.size": "World Size",
   "minicraft.settings.theme": "World Theme",
   "minicraft.settings.theme.normal": "Normal",

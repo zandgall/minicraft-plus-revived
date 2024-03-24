@@ -177,6 +177,7 @@
   "minicraft.settings.screenshot_scale": "Échelle du Screenshot",
   "minicraft.settings.sound": "Son",
   "minicraft.settings.autosave": "Sauvegarde automatique",
+  "minicraft.settings.vsync": "VSync",
   "minicraft.settings.size": "Taille du monde",
   "minicraft.settings.theme": "Thème du monde",
   "minicraft.settings.theme.normal": "Normal",
