@@ -29,13 +29,13 @@ public class Shader {
 			vs = glCreateShader(GL_VERTEX_SHADER);
 			glShaderSource(vs,
 				"#version 330 core\r\n" +
-					"layout (location=0) in vec4 in_position;\r\n" +
+					"layout (location=0) in vec3 in_position;\r\n" +
 					"layout (location = 1) in vec2 in_uv;\r\n" +
 					"layout (location = 2) in vec3 in_normal;\r\n" +
 					"out vec2 uv;\r\n" +
 					"uniform mat4 projection, view, transform;\r\n" +
 					"void main() {\r\n\t" +
-						"gl_Position = projection * view * transform * in_position;\r\n\t" +
+						"gl_Position = projection * view * transform * vec4(in_position, 1);\r\n\t" +
 						"uv = in_uv;" +
 					"}");
 			glCompileShader(vs);
@@ -189,6 +189,10 @@ public class Shader {
 
 		public void setRadius(int r) {glUniform1i(uniformLocation("r"), r);}
 
+		public void setColor(int color) {
+			glUniform3f(uniformLocation("color"),
+				((color >> 16) & 0xff)/255.f, ((color >> 8) & 0xff)/255.f, (color & 0xff)/255.f);
+		}
 		public void setTexture(int texture) {
 			glActiveTexture(GL_TEXTURE0);
 			glBindTexture(GL_TEXTURE_2D, texture);

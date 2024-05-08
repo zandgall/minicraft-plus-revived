@@ -96,30 +96,6 @@ public class Initializer extends Game {
 		int ticks = 0;
 		long lastTimer1 = System.currentTimeMillis();
 
-		vao = glGenVertexArrays();
-		glBindVertexArray(vao);
-
-		int vbo = glGenBuffers();
-		glBindBuffer(GL_ARRAY_BUFFER, vbo);
-		glBufferData(GL_ARRAY_BUFFER, new float[] {
-			1.0f, 1.0f, 0.0f, 1, 1, 1, 0, 0, -1, // top right
-			1.0f, -1.0f, 0.0f, 1, 1, 0, 0, 0, -1, // bottom right
-			-1.0f, -1.0f, 0.0f, 1, 0, 0, 0, 0, -1, // bottom left
-			-1.0f,  1.0f, 0.0f, 1, 0, 1, 0, 0, -1  // top left
-		}, GL_STATIC_DRAW);
-		int ebo = glGenBuffers();
-		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
-		glBufferData(GL_ELEMENT_ARRAY_BUFFER, new int[] {
-			0, 1, 3, 1, 2, 3
-		}, GL_STATIC_DRAW);
-
-		glEnableVertexAttribArray(0);
-		glVertexAttribPointer(0, 4, GL_FLOAT, false, 9*Float.BYTES, 0);
-		glEnableVertexAttribArray(1);
-		glVertexAttribPointer(1, 2, GL_FLOAT, false, 9*Float.BYTES, 4*Float.BYTES);
-		glEnableVertexAttribArray(2);
-		glVertexAttribPointer(2, 3, GL_FLOAT, false, 9*Float.BYTES, 6*Float.BYTES);
-
 		glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 		glDisable(GL_DEPTH_TEST);
 		glEnable(GL_BLEND);
@@ -153,7 +129,7 @@ public class Initializer extends Game {
 
 				Shader.postprocess.use();
 				Shader.postprocess.setProjection(
-					new Matrix4f().ortho(0, WINDOW_SIZE.width, 0, WINDOW_SIZE.height, -1, 1)
+					new Matrix4f().ortho(0, WINDOW_SIZE.width, WINDOW_SIZE.height, 0, -1, 1)
 				);
 				Shader.postprocess.setTransform(
 					new Matrix4f().identity()
@@ -272,6 +248,30 @@ public class Initializer extends Game {
 		glfwShowWindow(window);
 
 		GL.createCapabilities();
+
+		vao = glGenVertexArrays();
+		glBindVertexArray(vao);
+
+		int vbo = glGenBuffers();
+		glBindBuffer(GL_ARRAY_BUFFER, vbo);
+		glBufferData(GL_ARRAY_BUFFER, new float[] {
+			1.0f, 1.0f, 0.0f, 1, 0, 0, 0, -1, // top right
+			1.0f, -1.0f, 0.0f, 1, 1, 0, 0, -1, // bottom right
+			-1.0f, -1.0f, 0.0f, 0, 1, 0, 0, -1, // bottom left
+			-1.0f,  1.0f, 0.0f, 0, 0, 0, 0, -1  // top left
+		}, GL_STATIC_DRAW);
+		int ebo = glGenBuffers();
+		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
+		glBufferData(GL_ELEMENT_ARRAY_BUFFER, new int[] {
+			0, 1, 3, 1, 2, 3
+		}, GL_STATIC_DRAW);
+
+		glEnableVertexAttribArray(0);
+		glVertexAttribPointer(0, 3, GL_FLOAT, false, 8*Float.BYTES, 0);
+		glEnableVertexAttribArray(1);
+		glVertexAttribPointer(1, 2, GL_FLOAT, false, 8*Float.BYTES, 3*Float.BYTES);
+		glEnableVertexAttribArray(2);
+		glVertexAttribPointer(2, 3, GL_FLOAT, false, 8*Float.BYTES, 5*Float.BYTES);
 	}
 
 	/**

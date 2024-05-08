@@ -105,8 +105,8 @@ public class Renderer extends Game {
 	}
 
 	public static void initScreen() {
-		screen = new Screen(WIDTH, HEIGHT);
-		lightScreen = new Screen(WIDTH, HEIGHT);
+		screen = new Screen(WIDTH, HEIGHT, 8);
+		lightScreen = new Screen(WIDTH, HEIGHT, 8);
 
 //		image = new BufferedImage(WIDTH, HEIGHT, BufferedImage.TYPE_INT_RGB);
 //		screen.pixels = ((DataBufferInt) image.getRaster().getDataBuffer()).getData();
@@ -124,6 +124,7 @@ public class Renderer extends Game {
 	public static void render() {
 		if (screen == null) return; // No point in this if there's no gui... :P
 
+		screen.clear(0);
 		if (readyToRenderGameplay) {
 			renderLevel();
 			if (player.renderGUI) renderGui();

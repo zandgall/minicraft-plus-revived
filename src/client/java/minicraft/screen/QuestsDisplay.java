@@ -424,7 +424,7 @@ public class QuestsDisplay extends Display {
 				Rectangle menuBounds = menus[1].getBounds();
 				rasterWidth = menuBounds.getWidth() - MinicraftImage.boxWidth * 2;
 				rasterHeight = menuBounds.getHeight() - MinicraftImage.boxWidth * 2;
-				this.simulatedRasterScreen = new Screen(rasterWidth, rasterHeight);;
+				this.simulatedRasterScreen = new Screen(rasterWidth, rasterHeight, 1);
 				rasterX = menuBounds.getLeft() + MinicraftImage.boxWidth;
 				rasterY = menuBounds.getTop() + MinicraftImage.boxWidth;
 			}

@@ -54,4 +54,9 @@ public class LavaTile extends Tile {
 	public int getLightRadius(Level level, int x, int y) {
 		return 6;
 	}
+
+	@Override
+	public int getLightColor(Level level, int x, int y) {
+		return 0xff0000;
+	}
 }

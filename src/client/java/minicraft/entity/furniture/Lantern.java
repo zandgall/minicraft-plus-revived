@@ -6,17 +6,18 @@ import org.jetbrains.annotations.NotNull;
 
 public class Lantern extends Furniture {
 	public enum Type {
-		NORM("Lantern", 9, 0),
-		IRON("Iron Lantern", 12, 2),
-		GOLD("Gold Lantern", 15, 4);
+		NORM("Lantern", 9, 0, 0xb5b2a8),
+		IRON("Iron Lantern", 12, 2, 0xd4a998),
+		GOLD("Gold Lantern", 15, 4, 0xfff5b5);
 
-		protected int light, offset;
+		protected int light, offset, color;
 		protected String title;
 
-		Type(String title, int light, int offset) {
+		Type(String title, int light, int offset, int color) {
 			this.title = title;
 			this.offset = offset;
 			this.light = light;
+			this.color = color;
 		}
 	}
 
@@ -45,5 +46,10 @@ public class Lantern extends Furniture {
 	@Override
 	public int getLightRadius() {
 		return type.light;
+	}
+
+	@Override
+	public int getLightColor() {
+		return type.color;
 	}
 }

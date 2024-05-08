@@ -27,6 +27,7 @@ public class Screen {
 	/// width and height of screen instance
 	private final int width;
 	private final int height;
+	private final int scale;
 
 	/// x and y offset of screen:
 	private int xOffset;
@@ -36,17 +37,18 @@ public class Screen {
 	private static final int BIT_MIRROR_X = 0x01; // Written in hexadecimal; binary: 01
 	private static final int BIT_MIRROR_Y = 0x02; // Binary: 10
 
-	private final int texture, framebuffer;
+	private final int texture, framebuffer, rbo;
 
 	// Outdated Information:
 	// Since each sheet is 256x256 pixels, each one has 1024 8x8 "tiles"
 	// So 0 is the start of the item sheet 1024 the start of the tile sheet, 2048 the start of the entity sheet,
 	// And 3072 the start of the gui sheet
 
-	public Screen(int width, int height) {
+	public Screen(int width, int height, int scale) {
 		/// Screen width and height are typically the window size (Renderer.WIDTH/HEIGHT), but not always (see QuestDisplay.java)
 		this.width = width;
 		this.height = height;
+		this.scale = scale;
 
 		framebuffer = glGenFramebuffers();
 		glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
@@ -59,16 +61,22 @@ public class Screen {
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, (ByteBuffer) null);
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width*scale, height*scale, 0, GL_RGBA, GL_UNSIGNED_BYTE, (ByteBuffer) null);
 		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, texture, 0);
 		glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
 		glDrawBuffer(GL_COLOR_ATTACHMENT0);
-		glViewport(0, 0, width, height);
+		rbo = glGenRenderbuffers();
+		glBindRenderbuffer(GL_RENDERBUFFER, rbo);
+		glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, width*scale, height*scale);
+		glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, rbo);
+		glViewport(0, 0, width*scale, height*scale);
 		glEnable(GL_BLEND);
 		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+		glClear(GL_DEPTH_BUFFER_BIT);
 		glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
 		glBindTexture(GL_TEXTURE_2D, 0);
+		glBindRenderbuffer(GL_RENDERBUFFER, 0);
 
 		if(ditherTexture == 0) {
 			ByteBuffer buffer = BufferUtils.createByteBuffer(16);
@@ -94,7 +102,7 @@ public class Screen {
 	public void clear(int color) {
 		// Turns each pixel into a single color (clearing the screen!)
 		glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
-		glViewport(0, 0, width, height);
+		glViewport(0, 0, width*scale, height*scale);
 		glClearColor(((color >> 16) & 0xFF) / 255.f, ((color >> 8) & 0xFF) / 255.f, (color & 0xFF) / 255.f, ((color >> 24) & 0xFF) / 255.f);
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	}
@@ -176,27 +184,44 @@ public class Screen {
 		// Validation check
 //		if (xt * 8 + yt * 8 * sheet.width + 7 + 7 * sheet.width >= sheet.pixels.length) {
 		// OpenGL has no problems when referencing textures out of bounds, so no need to check if within texture data
-		// But can check if outside sheet dimensions
+		// But can check if outside sheet dimensions, and if so, use default VAO
+		int vao, elements;
 		if (xt * 8 >= sheet.width || yt * 8 >= sheet.height) {
 			sheet = Renderer.spriteLinker.missingSheet(SpriteType.Item);
 			xt = 0;
 			yt = 0;
+			vao = Game.getVao();
+			elements = 6;
+		} else {
+			vao = sheet.vaos[xt][yt];
+			elements = sheet.numElements[xt][yt];
+			if(vao != Game.getVao()) {
+				vao = sheet.vaos[xt][yt];
+			}
 		}
 
 		glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
-		glViewport(0, 0, width, height);
+		glEnable(GL_DEPTH_TEST);
+		glDepthFunc(GL_LEQUAL);
+//		glDisable(GL_CULL_FACE);
+		glViewport(0, 0, width*scale, height*scale);
 		Shader.tile.use();
-		Shader.tile.setProjection(new Matrix4f().ortho(0, width, height, 0, -1, 1));
-		Shader.tile.setTransform(new Matrix4f().identity().translate(xp + 4, yp + 4, 0).scale(4));
+//		Shader.tile.setProjection(new Matrix4f().ortho(0, width, height, 0, 0, 100));
+		Shader.tile.setProjection(new Matrix4f().perspective((float)Math.PI/2.f, (float)width/height, 0.1f, 50.f));
+//		Shader.tile.setTransform(new Matrix4f().identity().translate(xp + 4, yp + 4, -100).scale(4, -4, 1));
+		Shader.tile.setTransform(new Matrix4f().identity()
+			.translate(((xp+4.f) / height) * 100 - 50 * (float)width / height, ((yp+4.f) / height) * -100 + 50, -50.f)
+			.scale(400.f/height, 400.f/height, 1));
+		Shader.tile.setView(new Matrix4f().identity().m21(1).translate(0, 50.f, 0));
 		Shader.tile.setTexOffset(xt, yt);
 		Shader.tile.setMirror(mirrorX, mirrorY);
 		Shader.tile.setFullBright(fullbright);
 		Shader.tile.setWhiteTint(whiteTint);
 		Shader.tile.setColor(color);
 		Shader.tile.setTexture(sheet.texture);
-		glBindVertexArray(Game.getVao());
-		glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
-
+		glBindVertexArray(vao);
+		glDrawElements(GL_TRIANGLES, elements, GL_UNSIGNED_INT, 0);
+		glDisable(GL_DEPTH_TEST);
 	}
 
 	/**
@@ -206,7 +231,7 @@ public class Screen {
 	 */
 	public void render(int x, int y, int width, int height, int color) {
 		glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
-		glViewport(0, 0, this.width, this.height);
+		glViewport(0, 0, this.width*scale, this.height*scale);
 
 		Shader.tile.use();
 		Shader.tile.setProjection(new Matrix4f().ortho(0, this.width, this.height, 0, -1, 1));
@@ -222,7 +247,7 @@ public class Screen {
 	 */
 	public void render(int xp, int yp, Screen screen2) {
 		glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
-		glViewport(0, 0, w, h);
+		glViewport(0, 0, width*scale, height*scale);
 
 		Shader.passthrough.use();
 		Shader.passthrough.setProjection(new Matrix4f().ortho(0, width, height, 0, -1, 1));
@@ -262,9 +287,11 @@ public class Screen {
 		double tintFactor = getTintFactor(currentLevel);
 
 		glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
-		glViewport(0, 0, width, height);
+		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, texture, 0);
+		glDrawBuffer(GL_COLOR_ATTACHMENT0);
+		glViewport(0, 0, width*scale, height*scale);
 		Shader.overlay.use();
-		Shader.overlay.setProjection(new Matrix4f().ortho(0, width, 0, height, -1, 1));
+		Shader.overlay.setProjection(new Matrix4f().ortho(0, width,  height, 0, -1, 1));
 		Shader.overlay.setTransform(new Matrix4f().identity()
 			.translate(width / 2.f, height / 2.f, 0)
 			.scale(width / 2.f, height / 2.f, 1));
@@ -306,21 +333,34 @@ public class Screen {
 		return tintFactor;
 	}
 
-	public void renderLight(int x, int y, int r) {
+	public void renderLight(int x, int y, int r, int color) {
 		// Applies offsets:
 		x -= xOffset;
 		y -= yOffset;
 
+		int newTex = glGenTextures();
+		glBindTexture(GL_TEXTURE_2D, newTex);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width*scale, height*scale, 0, GL_RGBA, GL_UNSIGNED_BYTE, (ByteBuffer) null);
+		glBindFramebuffer(GL_READ_FRAMEBUFFER, framebuffer);
+		glReadBuffer(GL_COLOR_ATTACHMENT0);
+		glCopyTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, 0, 0, width, height);
+
 		glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
-		glViewport(0, 0, width, height);
+		glViewport(0, 0, width*scale, height*scale);
 		Shader.lighting.use();
 		Shader.lighting.setProjection(new Matrix4f().ortho(0, width, height, 0, -1, 1));
 		Shader.lighting.setTransform(new Matrix4f().identity().translate(x,y,0).scale(r,r,1));
 		Shader.lighting.setRectangle(x-r,y-r,x+r,y+r);
 		Shader.lighting.setScreenSize(Renderer.WIDTH, Renderer.HEIGHT);
 		Shader.lighting.setRadius(r);
-		Shader.lighting.setTexture(texture);
+		Shader.lighting.setColor(color);
+		Shader.lighting.setTexture(newTex);
 		glBindVertexArray(Game.getVao());
 		glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+		glDeleteTextures(newTex);
 	}
 }

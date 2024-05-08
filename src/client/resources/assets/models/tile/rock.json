@@ -1,0 +1,37 @@
+{
+  "models": {
+    "0": {
+      "0": { "model": "raisedPlatform.obj" },
+      "1": { "model": "raisedPlatform.obj" }
+    },
+    "1": {
+      "0": { "model": "raisedPlatform.obj" },
+      "1": { "model": "raisedPlatform.obj" }
+    }
+  },
+  "border": {
+    "key": "rock_border",
+    "corner": "rock_corner",
+    "models": {
+      "0": {
+        "0": {  "borderModel": "rock_border.0.0.obj",
+                "cornerModel": "rock_corner.0.0.obj"},
+        "1": {  "borderModel": "rock_border.0.1.obj",
+                "cornerModel": "rock_corner.0.1.obj"},
+        "2": { "borderModel": "rock_border.0.2.obj" }
+      },
+      "1": {
+        "0": {  "borderModel": "rock_border.1.0.obj",
+                "cornerModel": "rock_corner.1.0.obj"},
+        "1": {  "borderModel": "raisedPlatform.obj",
+                "cornerModel": "rock_corner.1.1.obj"},
+        "2": { "borderModel": "rock_border.1.2.obj" }
+      },
+      "2": {
+        "0": { "borderModel": "rock_border.2.0.obj" },
+        "1": { "borderModel": "rock_border.2.1.obj" },
+        "2": { "borderModel": "rock_border.2.2.obj" }
+      }
+    }
+  }
+}

@@ -1132,6 +1132,16 @@ public class Player extends Mob implements ItemHolder, ClientTickable {
 		return r; // Return light radius
 	}
 
+	@Override
+	public int getLightColor() {
+		if(activeItem != null && activeItem instanceof FurnitureItem) {
+			int rr = ((FurnitureItem) activeItem).furniture.getLightRadius();
+			if(rr > 5) // if brighter than player's ambient light
+				return ((FurnitureItem) activeItem).furniture.getLightColor();
+		}
+		return 0x999999;
+	}
+
 	/**
 	 * What happens when the player dies
 	 */

@@ -59,6 +59,10 @@ public class TorchTile extends Tile {
 		return 5;
 	}
 
+	public int getLightColor(Level level, int x, int y) {
+		return 0xd14924;
+	}
+
 	public boolean interact(Level level, int xt, int yt, Player player, Item item, Direction attackDir) {
 		if (item instanceof PowerGloveItem) {
 			int data = level.getData(xt, yt);

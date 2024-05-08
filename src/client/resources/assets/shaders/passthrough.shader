@@ -8,4 +8,6 @@ out vec4 out_color;
 
 void main() {
 	out_color = texture2D(texture, uv);
+	out_color.w = 1;
+	out_color.x = 1;
 }

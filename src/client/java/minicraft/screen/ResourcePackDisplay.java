@@ -24,6 +24,12 @@ import minicraft.util.Logging;
 import org.jetbrains.annotations.NotNull;
 import org.json.JSONException;
 import org.json.JSONObject;
+import org.lwjgl.BufferUtils;
+import org.lwjgl.assimp.AIAABB;
+import org.lwjgl.assimp.AIMesh;
+import org.lwjgl.assimp.AIScene;
+import org.lwjgl.assimp.AIVector2D;
+import org.lwjgl.assimp.AIVector3D;
 
 import javax.imageio.ImageIO;
 
@@ -39,6 +45,9 @@ import java.io.InputStreamReader;
 import java.net.MalformedURLException;
 import java.net.URISyntaxException;
 import java.net.URL;
+import java.nio.ByteBuffer;
+import java.nio.FloatBuffer;
+import java.nio.IntBuffer;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.FileSystems;
 import java.nio.file.Path;
@@ -55,6 +64,14 @@ import java.util.Objects;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 import java.util.zip.ZipOutputStream;
+
+import static org.lwjgl.assimp.Assimp.aiImportFile;
+import static org.lwjgl.assimp.Assimp.aiImportFileFromMemory;
+import static org.lwjgl.assimp.Assimp.aiProcess_FixInfacingNormals;
+import static org.lwjgl.assimp.Assimp.aiProcess_FlipUVs;
+import static org.lwjgl.assimp.Assimp.aiProcess_GenBoundingBoxes;
+import static org.lwjgl.assimp.Assimp.aiProcess_Triangulate;
+import static org.lwjgl.opengl.GL30.*;
 
 public class ResourcePackDisplay extends Display {
 	/* Resource Pack
@@ -747,6 +764,7 @@ public class ResourcePackDisplay extends Display {
 			if (pack.openStream()) {
 				try {
 					loadTextures(pack);
+					loadModels(pack);
 					loadLocalization(pack);
 					loadBooks(pack);
 					loadSounds(pack);
@@ -894,6 +912,183 @@ public class ResourcePackDisplay extends Display {
 				Logging.RESOURCEHANDLER_RESOURCEPACK.warn("Unable to load {} in pack : {}", p, pack.name);
 			}
 		}
+	}
+
+	/**
+	 * Loading the models of the pack.
+	 *
+	 * @param pack The pack to be loaded.
+	 * @throws IOException if I/O exception occurs.
+	 */
+	private static void loadModels(ResourcePack pack) throws IOException {
+		for (String t : pack.getFiles("assets/models/", null)) {
+			switch (t) {
+				case "assets/models/entity/":
+					loadModels(pack, SpriteType.Entity);
+					break;
+				case "assets/models/gui/":
+					loadModels(pack, SpriteType.Gui);
+					break;
+				case "assets/models/item/":
+					loadModels(pack, SpriteType.Item);
+					break;
+				case "assets/models/tile/":
+					loadModels(pack, SpriteType.Tile);
+					break;
+			}
+		}
+	}
+
+	/**
+	 * @param pack The pack to be loaded.
+	 * @param type The category of model.
+	 * @throws IOException if I/O exception occurs.
+	 */
+	private static void loadModels(ResourcePack pack, SpriteType type) throws IOException {
+		String path = "assets/models/";
+		switch (type) {
+			case Entity:
+				path += "entity/";
+				break;
+			case Gui:
+				path += "gui/";
+				break;
+			case Item:
+				path += "item/";
+				break;
+			case Tile:
+				path += "tile/";
+				break;
+		}
+
+		// Loading sprite sheet metadata.
+		for (String m : pack.getFiles(path, (p, isDir) -> p.toString().endsWith(".json") && !isDir)) {
+			try {
+				JSONObject obj = new JSONObject(readStringFromInputStream(pack.getResourceAsStream(m)));
+				String key = m.substring(path.length(), m.length()-5);
+				MinicraftImage image = Renderer.spriteLinker.getSheet(type, key);
+				JSONObject models = obj.optJSONObject("models");
+				if(models != null)
+					loadOBJModels(pack, models, image, path, "model");
+				JSONObject border = obj.optJSONObject("border");
+				if(border != null){
+					String bKey = border.getString("key");
+					String cKey = border.getString("corner");
+					models = border.optJSONObject("models");
+					if(models==null) break;
+					if(bKey.isEmpty()) bKey = null;
+					if(bKey != null) {
+						MinicraftImage bImage = Renderer.spriteLinker.getSheet(type, bKey);
+						loadOBJModels(pack, models, bImage, path, "borderModel");
+					}
+					if(cKey.isEmpty()) cKey = null;
+					if(cKey != null) {
+						MinicraftImage cImage = Renderer.spriteLinker.getSheet(type, cKey);
+						loadOBJModels(pack, models, cImage, path, "cornerModel");
+					}
+				}
+
+			} catch (JSONException | IOException e) {
+				Logging.RESOURCEHANDLER_RESOURCEPACK.warn(e, "Unable to read {} in pack: {}", m, pack.name);
+			}
+		}
+	}
+
+	private static void loadOBJModels(ResourcePack pack, JSONObject meta, MinicraftImage sheet, String path, String key) throws IOException {
+		for(int x = 0; x < sheet.width / 8; x++) {
+			JSONObject modelXGround = meta.optJSONObject(String.valueOf(x));
+			for(int y = 0; modelXGround!=null && y < sheet.height / 8; y++) {
+				JSONObject modelYGroup = modelXGround.optJSONObject(String.valueOf(y));
+				if(modelYGroup == null)
+					continue;
+				String modelPath = modelYGroup.optString(key);
+				if(modelPath.isEmpty()) modelPath = null;
+				if(modelPath == null)
+					continue;
+				modelPath = path + modelPath;
+				InputStream stream = pack.getResourceAsStream(modelPath);
+				ByteBuffer data = BufferUtils.createByteBuffer(stream.available());
+				while(stream.available()>0)
+					data.put((byte)stream.read());
+				data.flip();
+				try(AIScene scene = aiImportFileFromMemory(data, aiProcess_Triangulate | aiProcess_FlipUVs | aiProcess_FixInfacingNormals | aiProcess_GenBoundingBoxes, (ByteBuffer) null)) {
+					AIMesh mesh = AIMesh.create(scene.mMeshes().get(0));
+					loadMesh(sheet, x, y, mesh);
+				}
+			}
+		}
+	}
+
+	/**
+	 * Loads an Assimp mesh and returns an OpenGL VAO
+	 * @param sheet Minicraft sheet to apply VAO to
+	 * @param x Minicraft sheet x index
+	 * @param y Minicraft sheet y index
+	 * @param mesh Assimp mesh
+	 * @return OpenGL Vertex Array Object
+	 */
+	private static void loadMesh(MinicraftImage sheet, int x, int y, AIMesh mesh) {
+		AIAABB box = mesh.mAABB();
+		AIVector3D mi = box.mMin(), ma = box.mMax();
+		System.out.println(mi.x() + ", " + mi.y() + ", " + mi.z() + " -> " + ma.x() + ", " + ma.y() + ", " + ma.z());
+		int vao = glGenVertexArrays();
+		glBindVertexArray(vao);
+		int vertices = glGenBuffers();
+		glBindBuffer(GL_ARRAY_BUFFER, vertices);
+
+		nglBufferData(GL_ARRAY_BUFFER, AIVector3D.SIZEOF*mesh.mVertices().remaining(), mesh.mVertices().address(), GL_STATIC_DRAW);
+		glEnableVertexAttribArray(0);
+		glVertexAttribPointer(0, 3, GL_FLOAT, false, 0, 0);
+
+		int normals = glGenBuffers();
+		glBindBuffer(GL_ARRAY_BUFFER, normals);
+		nglBufferData(GL_ARRAY_BUFFER, AIVector3D.SIZEOF*mesh.mNormals().remaining(), mesh.mNormals().address(), GL_STATIC_DRAW);
+		glEnableVertexAttribArray(2);
+		glVertexAttribPointer(2, 3, GL_FLOAT, false, 0, 0);
+
+		// Textures come in vec3s, need to drop the z component of each
+		FloatBuffer filteredTextureBuffer = BufferUtils.createFloatBuffer(mesh.mTextureCoords(0).remaining()*2);
+		for(int i = 0, n = mesh.mTextureCoords(0).remaining(); i < n; i++) {
+			AIVector3D tex = mesh.mTextureCoords(0).get(i);
+			filteredTextureBuffer.put(tex.x());
+			filteredTextureBuffer.put(tex.y());
+		}
+		filteredTextureBuffer.flip();
+
+		int uvs = glGenBuffers();
+		glBindBuffer(GL_ARRAY_BUFFER, uvs);
+		glBufferData(GL_ARRAY_BUFFER, filteredTextureBuffer, GL_STATIC_DRAW);
+		glEnableVertexAttribArray(1);
+		glVertexAttribPointer(1, 2, GL_FLOAT, false, 0, 0);
+		/*FloatBuffer buffer = BufferUtils.createFloatBuffer(mesh.mNumVertices() * 8);
+		for(int i = 0; i < mesh.mNumVertices(); i++) {
+			buffer.put(mesh.mVertices().get(i).x());
+			buffer.put(mesh.mVertices().get(i).y());
+			buffer.put(mesh.mVertices().get(i).z());
+			buffer.put(mesh.mTextureCoords(i).x());
+			buffer.put(mesh.mTextureCoords(i).y());
+			buffer.put(mesh.mNormals().get(i).x());
+			buffer.put(mesh.mNormals().get(i).y());
+			buffer.put(mesh.mNormals().get(i).z());
+		}
+		buffer.flip();
+		glBufferData(GL_ARRAY_BUFFER, buffer, GL_STATIC_DRAW);
+		glEnableVertexAttribArray(0);
+		glVertexAttribPointer(0, 4, GL_FLOAT, false, 9*Float.BYTES, 0);
+		glEnableVertexAttribArray(1);
+		glVertexAttribPointer(1, 2, GL_FLOAT, false, 9*Float.BYTES, 4*Float.BYTES);
+		glEnableVertexAttribArray(2);
+		glVertexAttribPointer(2, 3, GL_FLOAT, false, 9*Float.BYTES, 6*Float.BYTES);*/
+
+		int indices = glGenBuffers();
+		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indices);
+		IntBuffer elementArrayData = BufferUtils.createIntBuffer(mesh.mNumFaces() * 3);
+		for(int i = 0; i < mesh.mNumFaces(); i++) {
+			elementArrayData.put(mesh.mFaces().get(i).mIndices());
+		}
+		elementArrayData.flip();
+		glBufferData(GL_ELEMENT_ARRAY_BUFFER, elementArrayData, GL_STATIC_DRAW);
+		sheet.setVao(x, y, vao, mesh.mNumFaces()*3);
 	}
 
 	/**

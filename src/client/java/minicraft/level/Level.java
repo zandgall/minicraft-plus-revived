@@ -533,7 +533,8 @@ public class Level {
 		List<Entity> entities = getEntitiesInTiles(xo - r, yo - r, w + xo + r, h + yo + r);
 		for (Entity e : entities) {
 			int lr = e.getLightRadius();
-			if (lr > 0) screen.renderLight(e.x - 1, e.y - 4, lr * brightness);
+			int lc = e.getLightColor();
+			if (lr > 0) screen.renderLight(e.x - 1, e.y - 4, lr * brightness, lc);
 		}
 
 		for (int y = yo - r; y <= h + yo + r; y++) {
@@ -541,7 +542,8 @@ public class Level {
 				if (x < 0 || y < 0 || x >= this.w || y >= this.h) continue;
 
 				int lr = getTile(x, y).getLightRadius(this, x, y);
-				if (lr > 0) screen.renderLight(x * 16 + 8, y * 16 + 8, lr * brightness);
+				int lc = getTile(x, y).getLightColor(this, x, y);
+				if (lr > 0) screen.renderLight(x * 16 + 8, y * 16 + 8, lr * brightness, lc);
 			}
 		}
 		screen.setOffset(0, 0);

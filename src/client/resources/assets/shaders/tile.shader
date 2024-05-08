@@ -28,10 +28,12 @@ void main() {
 	nUV *= 8;
 	nUV /= textureSize(texture, 0);
 	out_color = texture2D(texture, nUV);
+// 	out_color.w = 1;
 	if(useWhiteTint && out_color.xyz == vec3(1))
 		out_color.xyz = whiteTint;
 	else if(fullbright)
 		out_color.xyz = vec3(1);
 	else if(useColor)
 		out_color.xyz = color;
+// 	out_color.xy = uv;
 }

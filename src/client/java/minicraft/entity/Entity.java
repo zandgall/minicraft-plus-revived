@@ -137,6 +137,10 @@ public abstract class Entity implements Tickable {
 		return 0;
 	} // Used for lanterns... and player? that might be about it, though, so idk if I want to put it here.
 
+	public int getLightColor() {
+		return 0;
+	} // Also used for just lanterns and players
+
 
 	/**
 	 * If this entity is touched by another entity (extended by sub-classes)

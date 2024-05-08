@@ -1,7 +1,9 @@
 package minicraft.gfx;
 
 import minicraft.core.CrashHandler;
+import minicraft.core.Game;
 import minicraft.gfx.SpriteLinker.LinkedSprite;
+import minicraft.util.Logging;
 import org.lwjgl.BufferUtils;
 
 import java.awt.image.BufferedImage;
@@ -22,6 +24,8 @@ public class MinicraftImage {
 
 	public final int width, height; // Width and height of the sprite sheet
 	public final int texture; // OpenGL texture handle the sprite sheet
+	public int[][] vaos;
+	public int[][] numElements;
 
 	/**
 	 * Default with maximum size of image.
@@ -101,5 +105,21 @@ public class MinicraftImage {
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, buffer);
 		glBindTexture(GL_TEXTURE_2D, 0);
+
+		// Set vao
+		this.vaos = new int[this.width / 8][this.height / 8];
+		this.numElements = new int[this.width / 8][this.height / 8];
+		for(int i = 0; i < vaos.length; i++)
+			for(int j = 0; j < vaos[i].length; j++) {
+				vaos[i][j] = Game.getVao();
+				numElements[i][j] = 6;
+			}
+	}
+
+	public void setVao(int x, int y, int vao, int elements) {
+		if(x >= vaos.length || y >= vaos[x].length)
+			Logging.RESOURCEHANDLER.error(new RuntimeException(String.format("Setting VAO out of bounds (%s, %s) for VAO ID: %s", x, y, vao)));
+		vaos[x][y] = vao;
+		numElements[x][y] = elements;
 	}
 }

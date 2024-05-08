@@ -86,6 +86,10 @@ public abstract class Tile {
 		return 0;
 	}
 
+	public int getLightColor(Level level, int x, int y) {
+		return 0x000000;
+	}
+
 	/**
 	 * Hurt the tile with a specified amount of damage.
 	 *
