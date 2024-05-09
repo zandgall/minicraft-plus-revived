@@ -4,6 +4,7 @@ import minicraft.core.CrashHandler;
 import minicraft.util.Logging;
 import org.jetbrains.annotations.Nullable;
 
+import javax.sound.sampled.AudioFileFormat;
 import javax.sound.sampled.AudioFormat;
 import javax.sound.sampled.AudioInputStream;
 import javax.sound.sampled.AudioSystem;
@@ -112,6 +113,7 @@ public class Sound {
 			ByteArrayOutputStream out = new ByteArrayOutputStream();
 			byte[] buf = new byte[8192];
 			int length;
+
 			while ((length = ain.read(buf)) != -1) {
 				out.write(buf, 0, length);
 			}
