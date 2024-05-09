@@ -8,7 +8,7 @@ allprojects {
 
     version = "2.2.0-dev6"
 
-    sourceCompatibility = 17
+    sourceCompatibility = 8
     [compileJava, compileTestJava]*.options*.encoding = 'UTF-8'
 
     repositories {
@@ -80,6 +80,22 @@ project(":client") {
 
     application {
         mainClass = 'minicraft.core.Game'
+    }
+
+    jar {
+        manifest {
+            attributes(
+                    'Main-Class': 'minicraft.core.Game',
+                    'Implementation-Title': project.name,
+                    'Implementation-Version': project.version,
+                    'SplashScreen-Image': "Minicraft_Splash_Screen_3.png")
+        }
+
+        duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+
+        from files(sourceSets.main.output.classesDirs)
+        from files(sourceSets.main.output.resourcesDir)
+        from { configurations.runtimeClasspath.collect { it.isDirectory() ? it : zipTree(it) } }
     }
 }
 

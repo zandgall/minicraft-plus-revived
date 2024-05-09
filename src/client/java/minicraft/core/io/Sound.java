@@ -69,7 +69,8 @@ public class Sound {
 				Line.Info[] sinfo = AudioSystem.getSourceLineInfo(info);
 				Line.Info[] tinfo = AudioSystem.getTargetLineInfo(info);
 				for (Line.Info value : sinfo) {
-					if (value instanceof DataLine.Info dataLineInfo) {
+					if (value instanceof DataLine.Info) {
+						DataLine.Info dataLineInfo = (DataLine.Info) value;
                         AudioFormat[] supportedFormats = dataLineInfo.getFormats();
 						for (AudioFormat af : supportedFormats)
 							Logging.RESOURCEHANDLER_SOUND.error(af);
@@ -77,7 +78,8 @@ public class Sound {
 				}
 				Logging.RESOURCEHANDLER_SOUND.error("-target:");
                 for (Line.Info value : tinfo) {
-                    if (value instanceof DataLine.Info dataLineInfo) {
+                    if (value instanceof DataLine.Info) {
+						DataLine.Info dataLineInfo = (DataLine.Info) value;
                         AudioFormat[] supportedFormats = dataLineInfo.getFormats();
                         for (AudioFormat af : supportedFormats)
                             Logging.RESOURCEHANDLER_SOUND.error(af);
