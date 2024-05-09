@@ -221,6 +221,7 @@ public class TutorialDisplayHandler {
 				screen.render(xPadding, yPadding, 1, lines.length * 8 + 8, Color.WHITE);;
 				screen.render(xPadding+textWidth + 8, yPadding, 1, lines.length * 8 + 8, Color.WHITE);;
 
+				int yPad = Screen.h/2 - (lines.length * 8)/2;
 				for (int i = 0; i < lines.length; i++) {
 					Font.drawCentered(lines[i], screen, yPad + 8 * i, Color.WHITE);
 				}

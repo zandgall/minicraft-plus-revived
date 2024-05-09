@@ -29,9 +29,11 @@ import minicraft.screen.LoadingDisplay;
 import minicraft.screen.Menu;
 import minicraft.screen.QuestsDisplay;
 import minicraft.screen.RelPos;
+import minicraft.screen.SignDisplayMenu;
 import minicraft.screen.TutorialDisplayHandler;
 import minicraft.screen.entry.ListEntry;
 import minicraft.screen.entry.StringEntry;
+import minicraft.util.Logging;
 import minicraft.util.Quest;
 import minicraft.util.Quest.QuestSeries;
 import org.joml.Matrix4f;
@@ -41,8 +43,7 @@ import org.lwjgl.system.MemoryStack;
 import javax.imageio.ImageIO;
 
 import java.awt.Canvas;
-import java.awt.Dimension;
-import java.awt.Graphics;
+import java.awt.Graphics2D;
 import java.awt.geom.AffineTransform;
 import java.awt.image.AffineTransformOp;
 import java.awt.image.BufferStrategy;
@@ -80,6 +81,8 @@ public class Renderer extends Game {
 	public static boolean readyToRenderGameplay = false;
 	public static boolean showDebugInfo = false;
 
+	public static SignDisplayMenu signDisplayMenu = null;
+
 	private static Ellipsis ellipsis = new SmoothEllipsis(new TickUpdater());
 
 	private static int potionRenderOffset = 0;
@@ -90,12 +93,12 @@ public class Renderer extends Game {
 		MinicraftImage skinsSheet;
 		try {
 			// These set the sprites to be used.
-			skinsSheet = new MinicraftImage(ImageIO.read(Objects.requireNonNull(Game.class.getResourceAsStream("/resources/textures/skins.png"))));
+			skinsSheet = MinicraftImage.createDefaultCompatible(ImageIO.read(Objects.requireNonNull(Game.class.getResourceAsStream("/resources/textures/skins.png"))));
 		} catch (NullPointerException e) {
 			// If a provided InputStream has no name. (in practice meaning it cannot be found.)
 			CrashHandler.crashHandle(e, new ErrorInfo("Sprite Sheet Not Found", ErrorInfo.ErrorType.UNEXPECTED, true, "A sprite sheet was not found."));
 			return null;
-		} catch (IOException | IllegalArgumentException e) {
+		} catch (IOException | IllegalArgumentException | MinicraftImage.MinicraftImageDimensionIncompatibleException e) {
 			// If there is an error reading the file.
 			CrashHandler.crashHandle(e, new ErrorInfo("Sprite Sheet Could Not be Loaded", ErrorInfo.ErrorType.UNEXPECTED, true, "Could not load a sprite sheet."));
 			return null;
@@ -206,8 +209,8 @@ public class Renderer extends Game {
 		if ((currentLevel != 3 || Updater.tickCount < Updater.dayLength / 4 || Updater.tickCount > Updater.dayLength / 2) && !isMode("minicraft.settings.mode.creative")) {
 			lightScreen.clear(0); // This doesn't mean that the pixel will be black; it means that the pixel will be DARK, by default; lightScreen is about light vs. dark, not necessarily a color. The light level it has is compared with the minimum light values in dither to decide whether to leave the cell alone, or mark it as "dark", which will do different things depending on the game level and time of day.
 			int brightnessMultiplier = player.potioneffects.containsKey(PotionType.Light) ? 12 : 8; // Brightens all light sources by a factor of 1.5 when the player has the Light potion effect. (8 above is normal)
-			level.renderLight(lightScreen, xScroll, yScroll, brightnessMultiplier); // Finds (and renders) all the light from objects (like the player, lanterns, and lava).
-			screen.overlay(lightScreen, currentLevel, xScroll, yScroll); // Overlays the light screen over the main screen.
+			level.renderLight(screen, xScroll, yScroll, brightnessMultiplier); // Finds (and renders) all the light from objects (like the player, lanterns, and lava).
+			screen.overlay(currentLevel, xScroll, yScroll); // Overlays the light screen over the main screen.
 		}
 	}
 
@@ -415,6 +418,7 @@ public class Renderer extends Game {
 
 		TutorialDisplayHandler.render(screen);
 		renderQuestsDisplay();
+		if (signDisplayMenu != null) signDisplayMenu.render(screen);
 		renderDebugInfo();
 	}
 

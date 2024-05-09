@@ -52,7 +52,7 @@ public class OptionsWorldDisplay extends Display {
 			entries.add(4, Settings.getEntry("showquests"));
 		}
 
-		menus = new Menu[]{
+		menus = new Menu[] {
 			new Menu.Builder(false, 6, RelPos.LEFT, entries)
 				.setTitle("minicraft.displays.options_world")
 				.createMenu()
@@ -68,7 +68,6 @@ public class OptionsWorldDisplay extends Display {
 			new SelectEntry("minicraft.display.options_display.change_key_bindings", () -> Game.setDisplay(new KeyInputDisplay())),
 			new SelectEntry("minicraft.displays.controls", () -> Game.setDisplay(new ControlsDisplay())),
 			new SelectEntry("minicraft.display.options_display.language", () -> Game.setDisplay(new LanguageSettingsDisplay())),
-			Settings.getEntry("screenshot"),
 			new SelectEntry("minicraft.display.options_display.resource_packs", () -> Game.setDisplay(new ResourcePackDisplay()))
 		));
 	}

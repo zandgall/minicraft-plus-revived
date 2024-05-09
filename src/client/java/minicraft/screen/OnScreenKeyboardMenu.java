@@ -2,13 +2,16 @@ package minicraft.screen;
 
 import com.studiohartman.jamepad.ControllerButton;
 import minicraft.core.Game;
+import minicraft.core.Renderer;
 import minicraft.core.io.InputHandler;
 import minicraft.core.io.Sound;
 import minicraft.gfx.Dimension;
 import minicraft.gfx.Font;
+import minicraft.gfx.MinicraftImage;
 import minicraft.gfx.Point;
 import minicraft.gfx.Rectangle;
 import minicraft.gfx.Screen;
+import minicraft.gfx.SpriteLinker;
 import org.jetbrains.annotations.Nullable;
 
 import java.awt.Label;
@@ -33,7 +36,6 @@ public class OnScreenKeyboardMenu extends Menu {
 
 	/**
 	 * This checks if there is any controller connected. If true, create the instance. No otherwise.
-	 *
 	 * @return The created menu instance. `null` if there is no controller connected.
 	 */
 	@Nullable
@@ -270,15 +272,15 @@ public class OnScreenKeyboardMenu extends Menu {
 		screen.render(x, y+renderingTop, width, 2, 0xFFEFEFEF);
 
 		final int keyHeight = 14;
+		final int keyWidth = 16;
 		VirtualKey[][] keys = shiftPressed ? keysB : keysF;
+		MinicraftImage sheet = Renderer.spriteLinker.getSheet(SpriteLinker.SpriteType.Gui, "osk");
 		for (int r = 0; r < keys.length; r++) {
-			final int defaultKeyWidth = 16;
-			int keyWidth = defaultKeyWidth;
 			int totalLength = (keys[r].length * keyWidth);
 			totalLength += keyWidth * 2 * (int) Stream.of(keys[r]).filter(k -> k == spaceBar).count();
 			totalLength += keyWidth * (int) Stream.of(keys[r]).filter(k -> k == shiftKey).count();
 			int xOffset = (Screen.w - totalLength) / 2;
-			int y = renderingTop + 2 + r * keyHeight;
+			int y = top + 2 + r * keyHeight;
 			int x = xOffset;
 			for (int c = 0; c < keys[r].length; c++) {
 				VirtualKey key = keys[r][c];

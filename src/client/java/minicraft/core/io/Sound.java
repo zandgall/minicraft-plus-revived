@@ -11,6 +11,7 @@ import javax.sound.sampled.DataLine;
 import javax.sound.sampled.Line;
 import javax.sound.sampled.UnsupportedAudioFileException;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
@@ -18,6 +19,9 @@ import java.nio.ByteOrder;
 import java.nio.IntBuffer;
 import java.nio.ShortBuffer;
 import java.util.HashMap;
+import java.util.Iterator;
+import java.util.LinkedList;
+import java.util.Optional;
 
 import org.lwjgl.openal.AL;
 import org.lwjgl.openal.ALC;
@@ -62,7 +66,7 @@ public class Sound {
 			DataLine.Info info = new DataLine.Info(null, format);
 
 			if (!AudioSystem.isLineSupported(info)) {
-				Logging.RESOURCEHANDLER_SOUND.error("ERROR: Audio format of file \"{}\" in pack \"\" is not supported: {}", key, pack, AudioSystem.getAudioFileFormat(in));
+				Logging.RESOURCEHANDLER_SOUND.error("ERROR: Audio format of file \"{}\" in pack \"{}\" is not supported: {}", key, pack, AudioSystem.getAudioFileFormat(in));
 
 				Logging.RESOURCEHANDLER_SOUND.error("Supported audio formats:");
 				Logging.RESOURCEHANDLER_SOUND.error("-source:");
@@ -193,4 +197,8 @@ public class Sound {
 		else
 			alSourceStop(source);
 	}
+
+	/** @deprecated no longer supported, but reserved for future implementation. */
+	@Deprecated
+	public void loop(int count) {}
 }

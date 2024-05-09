@@ -36,6 +36,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.io.UncheckedIOException;
 import java.net.MalformedURLException;
 import java.net.URISyntaxException;
 import java.net.URL;
@@ -157,10 +158,14 @@ public class ResourcePackDisplay extends Display {
 		defaultPack = Objects.requireNonNull(loadPackMetadata(defaultPackURL));
 		loadedPacks.add(defaultPack);
 		try {
-			defaultLogo = new MinicraftImage(ImageIO.read(ResourcePackDisplay.class.getResourceAsStream("/resources/default_pack.png")));
+			defaultLogo = MinicraftImage.createDefaultCompatible(ImageIO.read(Objects.requireNonNull(ResourcePackDisplay.class.getResourceAsStream("/resources/default_pack.png"))));
 		} catch (IOException e) {
 			CrashHandler.crashHandle(e);
-			throw new RuntimeException();
+			throw new UncheckedIOException(e);
+		} catch (MinicraftImage.MinicraftImageDimensionIncompatibleException | NullPointerException e) {
+			CrashHandler.crashHandle(e);
+			//noinspection ProhibitedExceptionThrown
+			throw new RuntimeException(e);
 		}
 	}
 
@@ -183,7 +188,7 @@ public class ResourcePackDisplay extends Display {
 
 		reloadEntries();
 
-		menus = new Menu[]{
+		menus = new Menu[] {
 			builder0.setEntries(entries0)
 				.createMenu(),
 			builder1.setEntries(entries1)
@@ -244,7 +249,7 @@ public class ResourcePackDisplay extends Display {
 	 */
 	private void refreshEntries() {
 		reloadEntries();
-		Menu[] newMenus = new Menu[]{
+		Menu[] newMenus = new Menu[] {
 			builder0.setEntries(entries0)
 				.createMenu(),
 			builder1.setEntries(entries1)
@@ -458,7 +463,7 @@ public class ResourcePackDisplay extends Display {
 				openStream();
 				InputStream in = getResourceAsStream("pack.png");
 				if (in != null) {
-					logo = new MinicraftImage(ImageIO.read(in));
+					logo = MinicraftImage.createDefaultCompatible(ImageIO.read(in));
 
 					// Logo size verification.
 					int h = logo.height;
@@ -473,12 +478,12 @@ public class ResourcePackDisplay extends Display {
 				}
 				close();
 
-			} catch (IOException | NullPointerException e) {
+			} catch (IOException | NullPointerException | MinicraftImage.MinicraftImageDimensionIncompatibleException e) {
 				Logging.RESOURCEHANDLER_RESOURCEPACK.warn(e, "Unable to load logo in pack: {}, loading default logo instead.", name);
 				if (this == defaultPack) {
 					try {
-						logo = new MinicraftImage(ImageIO.read(getClass().getResourceAsStream("/resources/logo.png")));
-					} catch (IOException e1) {
+						logo = new MinicraftImage(ImageIO.read(Objects.requireNonNull(getClass().getResourceAsStream("/resources/logo.png"))));
+					} catch (IOException | NullPointerException e1) {
 						CrashHandler.crashHandle(e1);
 					}
 				} else logo = defaultLogo;
@@ -487,7 +492,6 @@ public class ResourcePackDisplay extends Display {
 
 		/**
 		 * Open the stream of the zip file.
-		 *
 		 * @return {@code true} if the stream has successfully been opened.
 		 */
 		private boolean openStream() {
@@ -514,7 +518,6 @@ public class ResourcePackDisplay extends Display {
 
 		/**
 		 * Getting the stream by the path.
-		 *
 		 * @param path The path of the entry.
 		 * @return The input stream of the specified entry.
 		 * @throws IOException if an I/O error has occurred.
@@ -534,8 +537,7 @@ public class ResourcePackDisplay extends Display {
 
 		/**
 		 * Getting the subfiles under the specified entry directrory.
-		 *
-		 * @param path   The directory to be listed.
+		 * @param path The directory to be listed.
 		 * @param filter The filter to be applied.
 		 * @return The filtered (if any) subfile and subfolder list. Empty if not or invalid path.
 		 */
@@ -557,7 +559,6 @@ public class ResourcePackDisplay extends Display {
 
 	/**
 	 * Reading the string from the input stream.
-	 *
 	 * @param in The input stream to be read.
 	 * @return The returned string.
 	 */
@@ -568,7 +569,6 @@ public class ResourcePackDisplay extends Display {
 
 	/**
 	 * Loading pack metadata of the pack.
-	 *
 	 * @param file The path of the pack.
 	 * @return The loaded pack with metadata.
 	 */
@@ -628,7 +628,6 @@ public class ResourcePackDisplay extends Display {
 
 	/**
 	 * Finding the pack by pack's file URL.
-	 *
 	 * @param url The url for query.
 	 * @return The found resource pack. {@code null} if not found.
 	 */
@@ -650,7 +649,6 @@ public class ResourcePackDisplay extends Display {
 
 	/**
 	 * Refreshing the pack list by the urls.
-	 *
 	 * @param urls The packs' url to be refreshed.
 	 */
 	private static void refreshResourcePacks(List<URL> urls) {
@@ -689,7 +687,6 @@ public class ResourcePackDisplay extends Display {
 
 	/**
 	 * Loading the resource packs when loading preferences. This should only be called by {@link minicraft.saveload.Load}.
-	 *
 	 * @param names The names of the packs.
 	 */
 	public static void loadResourcePacks(String[] names) {
@@ -710,7 +707,6 @@ public class ResourcePackDisplay extends Display {
 
 	/**
 	 * Getting the names of the loaded packs. This should only be called by {@link minicraft.saveload.Save}.
-	 *
 	 * @return The names of currently loaded packs.
 	 */
 	public static ArrayList<String> getLoadedPacks() {
@@ -769,7 +765,6 @@ public class ResourcePackDisplay extends Display {
 
 	/**
 	 * Loading the textures of the pack.
-	 *
 	 * @param pack The pack to be loaded.
 	 * @throws IOException if I/O exception occurs.
 	 */
@@ -794,7 +789,6 @@ public class ResourcePackDisplay extends Display {
 
 	/**
 	 * Loading the categories of textures from the pack.
-	 *
 	 * @param pack The pack to be loaded.
 	 * @param type The category of textures.
 	 * @throws IOException if I/O exception occurs.
@@ -823,8 +817,9 @@ public class ResourcePackDisplay extends Display {
 				try {
 					JSONObject obj = new JSONObject(readStringFromInputStream(pack.getResourceAsStream(m)));
 					SpriteLinker.SpriteMeta meta = new SpriteLinker.SpriteMeta();
-					pngs.remove(m.substring(0, m.length() - 5));
-					BufferedImage image = ImageIO.read(pack.getResourceAsStream(m.substring(0, m.length() - 5)));
+					String imgName = m.substring(0, m.length() - 5);
+					pngs.remove(imgName);
+					BufferedImage image = ImageIO.read(pack.getResourceAsStream(imgName));
 
 					// Applying animations.
 					MinicraftImage sheet;
@@ -834,9 +829,12 @@ public class ResourcePackDisplay extends Display {
 						meta.frames = image.getHeight() / 16;
 						if (meta.frames == 0) throw new IOException(new IllegalArgumentException(String.format(
 							"Invalid frames 0 detected with {} in pack: {}", m, pack.name)));
+						validateImageAsset(pack, imgName, image, 16, 16 * meta.frames);
 						sheet = new MinicraftImage(image, 16, 16 * meta.frames);
-					} else
+					} else {
+						validateImageAsset(pack, imgName, image, 16, 16);
 						sheet = new MinicraftImage(image, 16, 16);
+					}
 					Renderer.spriteLinker.setSprite(type, m.substring(path.length(), m.length() - 9), sheet);
 
 					JSONObject borderObj = obj.optJSONObject("border");
@@ -847,7 +845,9 @@ public class ResourcePackDisplay extends Display {
 							String borderK = path + meta.border + ".png";
 							pngs.remove(borderK);
 							try {
-								Renderer.spriteLinker.setSprite(type, meta.border, new MinicraftImage(ImageIO.read(pack.getResourceAsStream(borderK)), 24, 24));
+								BufferedImage img = ImageIO.read(pack.getResourceAsStream(borderK));
+								validateImageAsset(pack, borderK, img, 24, 24);
+								Renderer.spriteLinker.setSprite(type, meta.border, new MinicraftImage(img, 24, 24));
 							} catch (IOException e) {
 								Logging.RESOURCEHANDLER_RESOURCEPACK.warn(e, "Unable to read {} with {} in pack: {}", borderK, m, pack.name);
 								meta.border = null;
@@ -860,7 +860,9 @@ public class ResourcePackDisplay extends Display {
 							String cornerK = path + meta.corner + ".png";
 							pngs.remove(cornerK);
 							try {
-								Renderer.spriteLinker.setSprite(type, meta.corner, new MinicraftImage(ImageIO.read(pack.getResourceAsStream(cornerK)), 16, 16));
+								BufferedImage img = ImageIO.read(pack.getResourceAsStream(cornerK));
+								validateImageAsset(pack, cornerK, img, 16, 16);
+								Renderer.spriteLinker.setSprite(type, meta.corner, new MinicraftImage(img, 16, 16));
 							} catch (IOException e) {
 								Logging.RESOURCEHANDLER_RESOURCEPACK.warn(e, "Unable to read {} with {} in pack: {}", cornerK, m, pack.name);
 								meta.corner = null;
@@ -882,10 +884,13 @@ public class ResourcePackDisplay extends Display {
 				BufferedImage image = ImageIO.read(pack.getResourceAsStream(p));
 				MinicraftImage sheet;
 				if (type == SpriteType.Item) {
+					validateImageAsset(pack, p, image, 8, 8);
 					sheet = new MinicraftImage(image, 8, 8); // Set the minimum tile sprite size.
 				} else if (type == SpriteType.Tile) {
+					validateImageAsset(pack, p, image, 16, 16);
 					sheet = new MinicraftImage(image, 16, 16); // Set the minimum item sprite size.
 				} else {
+					validateImageAsset(pack, p, image);
 					sheet = new MinicraftImage(image);
 				}
 
@@ -896,9 +901,28 @@ public class ResourcePackDisplay extends Display {
 		}
 	}
 
+	private static void validateImageAsset(ResourcePack pack, String key, BufferedImage image) {
+		try {
+			MinicraftImage.validateImageDimension(image);
+		} catch (MinicraftImage.MinicraftImageDimensionIncompatibleException e) {
+			Logging.RESOURCEHANDLER_RESOURCEPACK.warn("Potentially incompatible image detected: {} in pack: {}: "+
+				"image size ({}x{}) is not in multiple of 8.", key, pack.name, e.getWidth(), e.getHeight());
+		}
+	}
+
+	private static void validateImageAsset(ResourcePack pack, String key, BufferedImage image, int width, int height) {
+		validateImageAsset(pack, key, image);
+		try {
+			MinicraftImage.validateImageDimension(image, width, height);
+		} catch (MinicraftImage.MinicraftImageRequestOutOfBoundsException e) {
+			Logging.RESOURCEHANDLER_RESOURCEPACK.warn("Potentially incompatible image detected: {} in pack: {}: "+
+				"image size ({}x{}) is smaller than the required ({}x{}).", key, pack.name,
+				e.getSourceWidth(), e.getSourceWidth(), e.getRequestedWidth(), e.getRequestedHeight());
+		}
+	}
+
 	/**
 	 * Loading localization from the pack.
-	 *
 	 * @param pack The pack to be loaded.
 	 */
 	private static void loadLocalization(ResourcePack pack) {
@@ -942,7 +966,6 @@ public class ResourcePackDisplay extends Display {
 
 	/**
 	 * Loading the books from the pack.
-	 *
 	 * @param pack The pack to be loaded.
 	 */
 	private static void loadBooks(ResourcePack pack) {
@@ -974,7 +997,6 @@ public class ResourcePackDisplay extends Display {
 
 	/**
 	 * Loading sounds from the pack.
-	 *
 	 * @param pack The pack to be loaded.
 	 */
 	private static void loadSounds(ResourcePack pack) {

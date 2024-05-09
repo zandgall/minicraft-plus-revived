@@ -1,5 +1,6 @@
 package minicraft.screen;
 
+import minicraft.core.CrashHandler;
 import minicraft.core.Game;
 import minicraft.core.Renderer;
 import minicraft.core.io.InputHandler;
@@ -26,7 +27,10 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 import org.lwjgl.system.MemoryStack;
 
+import java.awt.image.BufferedImage;
+import java.awt.image.DataBufferInt;
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -206,12 +210,12 @@ public class QuestsDisplay extends Display {
 			}
 		}
 
-		seriesEntries = new SelectEntry[][]{
+		seriesEntries = new SelectEntry[][] {
 			unlocked.toArray(new SelectEntry[0]),
 			completed.toArray(new SelectEntry[0])
 		};
 
-		entrySeries = new QuestSeries[][]{
+		entrySeries = new QuestSeries[][] {
 			unlockedSeries.toArray(new QuestSeries[0]),
 			completedSeries.toArray(new QuestSeries[0])
 		};
@@ -221,7 +225,7 @@ public class QuestsDisplay extends Display {
 		super(true, true);
 		reloadEntries();
 
-		menus = new Menu[]{
+		menus = new Menu[] {
 			new Menu.Builder(false, 1, RelPos.CENTER)
 				.setPositioning(new Point(Screen.w / 2, Screen.h / 2 - 20), RelPos.CENTER)
 				.setDisplayLength(5)
@@ -262,7 +266,7 @@ public class QuestsDisplay extends Display {
 				series.isUnlocked() ? new StringEntry(Localization.getLocalized("minicraft.displays.quests.quest_info.display.status",
 					Localization.getLocalized("minicraft.displays.quests.quest_info.display.status.unlocked")), Color.WHITE, false) :
 					new StringEntry(Localization.getLocalized("minicraft.displays.quests.quest_info.display.status",
-					Localization.getLocalized("minicraft.displays.quests.quest_info.display.status.locked")), Color.GRAY, false) // Locked series would not been shown...?
+						Localization.getLocalized("minicraft.displays.quests.quest_info.display.status.locked")), Color.GRAY, false) // Locked series would not been shown...?
 			);
 
 			entries.add(new StringEntry(Localization.getLocalized("minicraft.displays.quests.quest_info.display.quests_completed_count",
@@ -275,7 +279,7 @@ public class QuestsDisplay extends Display {
 			entries.add(new BlankEntry());
 			entries.add(new SelectEntry("minicraft.displays.quests.quest_info.view_quests", () -> Game.setDisplay(new SeriesQuestViewerDisplay(series))));
 
-			menus = new Menu[]{
+			menus = new Menu[] {
 				new Menu.Builder(true, 0, RelPos.CENTER)
 					.setPositioning(new Point(Screen.w / 2, 5), RelPos.BOTTOM)
 					.setEntries(new StringEntry(Localization.getLocalized(series.key)))
@@ -357,7 +361,7 @@ public class QuestsDisplay extends Display {
 
 			public SeriesQuestViewerDisplay(QuestSeries series) {
 				super(false, true);
-				menus = new Menu[]{
+				menus = new Menu[] {
 					new Menu.Builder(true, 0, RelPos.CENTER, StringEntry.useLines("minicraft.displays.quests", series.key))
 						.setPositioning(new Point(Screen.w / 2, 6), RelPos.BOTTOM)
 						.createMenu(),
@@ -677,7 +681,7 @@ public class QuestsDisplay extends Display {
 						quest.isUnlocked() ? "minicraft.displays.quests.quest_info.display.status.unlocked" :
 							"minicraft.displays.quests.quest_info.display.status.locked";
 					int color = quest.isCompleted() ? Color.GREEN : quest.isUnlocked() ? Color.WHITE : Color.GRAY;
-					menus = new Menu[]{
+					menus = new Menu[] {
 						new Menu.Builder(true, 1, RelPos.CENTER)
 							.setPositioning(new Point(Screen.w / 2, 5), RelPos.BOTTOM)
 							.setEntries(new StringEntry(quest.getSeries().key),
@@ -763,7 +767,7 @@ public class QuestsDisplay extends Display {
 	private void updateEntries() {
 		menus[0].setEntries(seriesEntries[selectedEntry]);
 
-		String[] entryNames = new String[]{
+		String[] entryNames = new String[] {
 			"minicraft.displays.quests.display.header.unlocked", "minicraft.displays.quests.display.header.completed"
 		};
 

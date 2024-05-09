@@ -131,9 +131,12 @@ public class Screen {
 	}
 
 	public void render(int xp, int yp, Sprite sprite, int mirror, boolean fullbright, int color) {
+		boolean mirrorX = (mirror & BIT_MIRROR_X) > 0; // Horizontally.
+		boolean mirrorY = (mirror & BIT_MIRROR_Y) > 0; // Vertically.
 		for (int r = 0; r < sprite.spritePixels.length; r++) {
-			for (int c = 0; c < sprite.spritePixels[r].length; c++) {
-				Sprite.Px px = sprite.spritePixels[r][c];
+			int lr = mirrorY ? sprite.spritePixels.length - 1 - r : r;
+			for (int c = 0; c < sprite.spritePixels[lr].length; c++) {
+				Sprite.Px px = sprite.spritePixels[lr][mirrorX ? sprite.spritePixels[lr].length - 1 - c : c];
 				render(xp + c * 8, yp + r * 8, px, mirror, sprite.color, fullbright, color);
 			}
 		}
@@ -166,12 +169,25 @@ public class Screen {
 		if (sheet == null) return; // Verifying that sheet is not null.
 
 		// xp and yp are originally in level coordinates, but offset turns them to screen coordinates.
-		xp -= xOffset; //account for screen offset
-		yp -= yOffset;
+		// xOffset and yOffset account for screen offset
+		render(xp - xOffset, yp - yOffset, xt * 8, yt * 8, 8, 8, sheet, bits, whiteTint, fullbright, color);
+	}
 
-		// Determines if the image should be mirrored...
-		boolean mirrorX = (bits & BIT_MIRROR_X) > 0; // Horizontally.
-		boolean mirrorY = (bits & BIT_MIRROR_Y) > 0; // Vertically.
+	public void render(int xp, int yp, int xt, int yt, int tw, int th, MinicraftImage sheet) {
+		render(xp, yp, xt, yt ,tw, th, sheet, 0);
+	}
+	public void render(int xp, int yp, int xt, int yt, int tw, int th, MinicraftImage sheet, int mirrors) {
+		render(xp, yp, xt, yt ,tw, th, sheet, mirrors, -1);
+	}
+	public void render(int xp, int yp, int xt, int yt, int tw, int th, MinicraftImage sheet, int mirrors, int whiteTint) {
+		render(xp, yp, xt, yt, tw, th, sheet, mirrors, whiteTint, false);
+	}
+	public void render(int xp, int yp, int xt, int yt, int tw, int th, MinicraftImage sheet, int mirrors, int whiteTint, boolean fullbright) {
+		render(xp, yp, xt, yt, tw, th, sheet, mirrors, whiteTint, fullbright, 0);
+	}
+	// Any single pixel from the image can be rendered using this method.
+	public void render(int xp, int yp, int xt, int yt, int tw, int th, MinicraftImage sheet, int mirrors, int whiteTint, boolean fullBright, int color) {
+		if (sheet == null) return; // Verifying that sheet is not null.
 
 		// Validation check
 //		if (xt * 8 + yt * 8 * sheet.width + 7 + 7 * sheet.width >= sheet.pixels.length) {
@@ -286,21 +302,20 @@ public class Screen {
 
 			switch (Updater.getTime()) {
 				case Morning:
-					tintFactor = Updater.pastDay1 ? (1 - relTime) * MAXDARK : 0;
+					darkFactor = Updater.pastDay1 ? (1 - relTime) * MAXDARK : 0;
 					break;
 				case Day:
-					tintFactor = 0;
+					darkFactor = 0;
 					break;
 				case Evening:
-					tintFactor = relTime * MAXDARK;
+					darkFactor = relTime * MAXDARK;
 					break;
 				case Night:
-					tintFactor = MAXDARK;
+					darkFactor = MAXDARK;
 					break;
 			}
 
-			if (currentLevel > 3) tintFactor -= (tintFactor < 10 ? tintFactor : 10);
-			tintFactor *= -1; // All previous operations were assuming this was a darkening factor.
+			if (currentLevel > 3) darkFactor -= (darkFactor < 10 ? darkFactor : 10);
 		} else if (currentLevel >= 5)
 			tintFactor = -MAXDARK;
 		return tintFactor;
