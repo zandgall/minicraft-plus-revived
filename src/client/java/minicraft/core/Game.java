@@ -19,6 +19,8 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.List;
 
+import static org.lwjgl.glfw.GLFW.glfwSetWindowShouldClose;
+
 public class Game {
 	protected Game() {
 	} // Can't instantiate the Game class.
@@ -33,6 +35,16 @@ public class Game {
 	public static List<String> notifications = new ArrayList<>();
 
 	public static int MAX_FPS;
+
+	// OPENGL window context and VAO
+	static long window;
+	static int vao;
+	public static int getVao() {return vao;}
+	public static long getWindow() {return window;}
+
+	// Focus
+	static boolean focused;
+	public static boolean hasFocus() {return focused;}
 
 	// DISPLAY
 	static Display currentDisplay = null;
@@ -85,10 +97,8 @@ public class Game {
 	public static String gameDir; // The directory in which all the game files are stored
 	static boolean gameOver = false; // If the player wins this is set to true.
 
-	static boolean running = true;
-
 	public static void quit() {
-		running = false;
+		glfwSetWindowShouldClose(window, true);
 	}
 
 
@@ -100,15 +110,14 @@ public class Game {
 
 		Analytics.GameStartup.ping();
 
-		input = new InputHandler(Renderer.canvas);
+		input = new InputHandler();
+
+		Initializer.init();
 
 		ResourcePackDisplay.initPacks();
 		ResourcePackDisplay.reloadResources();
 
 		Tiles.initTileList();
-
-		// Load the selected language.
-		Initializer.createAndDisplayFrame();
 
 		setDisplay(new TitleDisplay()); // Sets menu to the title screen.
 
@@ -124,7 +133,6 @@ public class Game {
 			Updater.updateFullscreen();
 		}
 
-		Initializer.launchWindow();
 		// Actually start the game.
 		Initializer.run();
 

@@ -3,6 +3,7 @@ package minicraft.core;
 import minicraft.core.CrashHandler.ErrorInfo;
 import minicraft.core.io.Localization;
 import minicraft.core.io.Settings;
+import minicraft.core.io.Shader;
 import minicraft.entity.furniture.Bed;
 import minicraft.entity.mob.AirWizard;
 import minicraft.entity.mob.ObsidianKnight;
@@ -13,6 +14,7 @@ import minicraft.gfx.Ellipsis.DotUpdater.TickUpdater;
 import minicraft.gfx.Ellipsis.SmoothEllipsis;
 import minicraft.gfx.Font;
 import minicraft.gfx.FontStyle;
+import minicraft.gfx.GLHelper;
 import minicraft.gfx.MinicraftImage;
 import minicraft.gfx.Point;
 import minicraft.gfx.Screen;
@@ -36,10 +38,13 @@ import minicraft.screen.entry.StringEntry;
 import minicraft.util.Logging;
 import minicraft.util.Quest;
 import minicraft.util.Quest.QuestSeries;
+import org.joml.Matrix4f;
+import org.lwjgl.BufferUtils;
 
 import javax.imageio.ImageIO;
 
 import java.awt.Canvas;
+import java.awt.Dimension;
 import java.awt.Graphics2D;
 import java.awt.geom.AffineTransform;
 import java.awt.image.AffineTransformOp;
@@ -48,6 +53,7 @@ import java.awt.image.BufferedImage;
 import java.awt.image.DataBufferInt;
 import java.io.File;
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
@@ -55,6 +61,23 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+
+import static org.lwjgl.glfw.GLFW.glfwSwapBuffers;
+import static org.lwjgl.opengl.GL11.GL_COLOR_BUFFER_BIT;
+import static org.lwjgl.opengl.GL11.GL_DEPTH_BUFFER_BIT;
+import static org.lwjgl.opengl.GL11.GL_RGB;
+import static org.lwjgl.opengl.GL11.GL_TEXTURE_2D;
+import static org.lwjgl.opengl.GL11.GL_TRIANGLES;
+import static org.lwjgl.opengl.GL11.GL_UNSIGNED_BYTE;
+import static org.lwjgl.opengl.GL11.GL_UNSIGNED_INT;
+import static org.lwjgl.opengl.GL11.glBindTexture;
+import static org.lwjgl.opengl.GL11.glClear;
+import static org.lwjgl.opengl.GL11.glDrawElements;
+import static org.lwjgl.opengl.GL11.glGetTexImage;
+import static org.lwjgl.opengl.GL11.glViewport;
+import static org.lwjgl.opengl.GL30.GL_FRAMEBUFFER;
+import static org.lwjgl.opengl.GL30.glBindFramebuffer;
+import static org.lwjgl.opengl.GL30.glBindVertexArray;
 
 public class Renderer extends Game {
 	private Renderer() {
@@ -64,12 +87,12 @@ public class Renderer extends Game {
 	public static int WIDTH = 288;
 	static float SCALE = 3;
 
+	// The literal size of the window
+	public static Dimension WINDOW_SIZE;
+
 	public static Screen screen; // Creates the main screen
 	public static SpriteLinker spriteLinker = new SpriteLinker(); // The sprite linker for sprites
-
-	static Canvas canvas = new Canvas();
-	private static BufferedImage image; // Creates an image to be displayed on the screen.
-
+	private static long texture; // Creates a texture to be displayed on the screen.
 
 	public static boolean readyToRenderGameplay = false;
 	public static boolean showDebugInfo = false;
@@ -101,13 +124,12 @@ public class Renderer extends Game {
 	}
 
 	public static void initScreen() {
-		image = new BufferedImage(WIDTH, HEIGHT, BufferedImage.TYPE_INT_RGB);
-		screen = new Screen(image);
-		//lightScreen = new Screen();
+// 		image = new BufferedImage(WIDTH, HEIGHT, BufferedImage.TYPE_INT_RGB);
+		texture = GLHelper.createAndBindTexture(WIDTH, HEIGHT, GL_RGB);
+		screen = new Screen(texture);
 
 		hudSheet = new LinkedSprite(SpriteType.Gui, "hud");
-
-		canvas.createBufferStrategy(3);
+		WINDOW_SIZE = getWindowSize();
 	}
 
 
@@ -127,35 +149,37 @@ public class Renderer extends Game {
 		if (currentDisplay != null) // Renders menu, if present.
 			currentDisplay.render(screen);
 
-		if (!canvas.hasFocus())
+		if (!Game.hasFocus())
 			renderFocusNagger(); // Calls the renderFocusNagger() method, which creates the "Click to Focus" message.
-
-
-		BufferStrategy bs = canvas.getBufferStrategy(); // Creates a buffer strategy to determine how the graphics should be buffered.
-		Graphics2D g = (Graphics2D) bs.getDrawGraphics(); // Gets the graphics in which java draws the picture
-		g.clearRect(0, 0, canvas.getWidth(), canvas.getHeight()); // Draws a rect to fill the whole window (to cover last?)
-
-
 
 		// Flushes the screen to the renderer.
 		screen.flush();
 
-		// Scale the pixels.
-		int ww = getWindowSize().width;
-		int hh = getWindowSize().height;
-
-		// Get the image offset.
-		int xOffset = (canvas.getWidth() - ww) / 2 + canvas.getParent().getInsets().left;
-		int yOffset = (canvas.getHeight() - hh) / 2 + canvas.getParent().getInsets().top;
-
 		// Draw the image on the window.
-		g.drawImage(image, xOffset, yOffset, ww, hh, null);
+		glBindFramebuffer(GL_FRAMEBUFFER, 0);
+		glViewport(0, 0, WINDOW_SIZE.width, WINDOW_SIZE.height);
+		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-		// Release any system items that are using this method. (so we don't have crappy framerates)
-		g.dispose();
+		// Calculate how much we need to scale the screen to fit the window without stretching
+		float stretchWidth = (float)WINDOW_SIZE.width / Renderer.WIDTH;
+		float stretchHeight = (float)WINDOW_SIZE.height / Renderer.HEIGHT;
+		float scale = Math.min(stretchWidth, stretchHeight);
 
-		// Make the picture visible.
-		bs.show();
+		Shader.postprocess.use();
+		Shader.postprocess.setProjection(
+			new Matrix4f().ortho(0, WINDOW_SIZE.width, 0, WINDOW_SIZE.height, -1, 1)
+		);
+		Shader.postprocess.setTransform(
+			new Matrix4f().identity()
+				.translate(WINDOW_SIZE.width/2.f, WINDOW_SIZE.height/2.f,0)
+				.scale(Renderer.WIDTH*scale*0.5f, Renderer.HEIGHT*scale*0.5f, 1)
+		);
+		Shader.postprocess.setTransform(screen.getTexture());
+		glBindVertexArray(vao);
+		glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+
+		// Make the picture visible
+		glfwSwapBuffers(window);
 
 		// Screen capturing.
 		if (Updater.screenshot > 0) {
@@ -169,14 +193,26 @@ public class Renderer extends Game {
 				count++;
 			}
 
-			try {
-				// A blank image as same as the canvas
-				BufferedImage img = new BufferedImage(canvas.getWidth(), canvas.getHeight(), BufferedImage.TYPE_INT_RGB);
-				Graphics2D g2d = img.createGraphics();
-				g2d.drawImage(image, xOffset, yOffset, ww, hh, null); // The same invoke as the one on canvas graphics
-				g2d.dispose();
-				ImageIO.write(img, "png", file);
-				Logging.PLAYER.info("Saved screenshot as {}.", file.getName());
+			try { // https://stackoverflow.com/a/4216635
+				BufferedImage before = new BufferedImage(WIDTH, HEIGHT, BufferedImage.TYPE_INT_RGB);
+				ByteBuffer buffer = BufferUtils.createByteBuffer(WIDTH*HEIGHT*3);
+				glBindTexture(GL_TEXTURE_2D, screen.getTexture());
+				glGetTexImage(GL_TEXTURE_2D, 0, GL_RGB, GL_UNSIGNED_BYTE, buffer);
+				int[] rgb = new int[WIDTH*HEIGHT];
+				for(int i = 0; i < WIDTH * HEIGHT; i++) {
+					rgb[i] = ((((int)buffer.get(i*3))<<16) + (((int)buffer.get(i*3+1))<<8)+(int)buffer.get(i*3+2));
+				}
+				before.setRGB(0, 0, WIDTH, HEIGHT, rgb, 0, WIDTH);
+				int screenshot_scale = (Integer) Settings.get("screenshot");
+
+				AffineTransform at = AffineTransform.getScaleInstance(screenshot_scale, -screenshot_scale); // Setting the scaling.
+				at.translate(0, -HEIGHT); // Image is upside down at first, so scale -y and translate
+				AffineTransformOp scaleOp = new AffineTransformOp(at, AffineTransformOp.TYPE_NEAREST_NEIGHBOR);
+
+				// Use this solution without larger scales which use up a lot of memory.
+				// With scale 20, up to around 360MB overall RAM use.
+				BufferedImage after = scaleOp.filter(before, null);
+				ImageIO.write(after, "png", file);
 			} catch (IOException e) {
 				CrashHandler.errorHandle(e);
 			}

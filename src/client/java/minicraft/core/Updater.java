@@ -17,8 +17,15 @@ import minicraft.screen.TutorialDisplayHandler;
 import minicraft.screen.WorldSelectDisplay;
 import minicraft.util.AdvancementElement;
 import minicraft.util.Logging;
+import org.lwjgl.glfw.GLFWVidMode;
 
 import java.awt.GraphicsDevice;
+
+import static org.lwjgl.glfw.GLFW.glfwGetPrimaryMonitor;
+import static org.lwjgl.glfw.GLFW.glfwGetVideoMode;
+import static org.lwjgl.glfw.GLFW.glfwGetWindowPos;
+import static org.lwjgl.glfw.GLFW.glfwGetWindowSize;
+import static org.lwjgl.glfw.GLFW.glfwSetWindowMonitor;
 
 public class Updater extends Game {
 	private Updater() {
@@ -42,9 +49,11 @@ public class Updater extends Game {
 	public static int scoreTime; // Time remaining for score mode
 
 	/**
-	 * Indicates if FullScreen Mode has been toggled.
+	 * Indicates if FullScreen Mode has been toggled, and the window size when not fullscreened
 	 */
 	static boolean FULLSCREEN;
+
+	public static int savedX, savedY, savedW, savedH;
 
 	// AUTOSAVE AND NOTIFICATIONS
 
@@ -71,22 +80,24 @@ public class Updater extends Game {
 	}
 
 	static void updateFullscreen() {
-		// Dispose is needed to set undecorated value
-		Initializer.frame.dispose();
-
-		GraphicsDevice device = Initializer.frame.getGraphicsConfiguration().getDevice();
 		if (Updater.FULLSCREEN) {
-			Initializer.frame.setUndecorated(true);
-			device.setFullScreenWindow(Initializer.frame);
-		} else {
-			Initializer.frame.setUndecorated(false);
-			device.setFullScreenWindow(null);
-		}
+			// Save current windowed width and height to be set when exiting fullscreen
+			int[] resultA = new int[1], resultB = new int[1];
+			glfwGetWindowSize(Game.getWindow(), resultA, resultB);
+			savedW = resultA[0];
+			savedH = resultB[0];
+			glfwGetWindowPos(Game.getWindow(), resultA, resultB);
+			savedX = resultA[0];
+			savedY = resultB[0];
 
-		// Show frame again
-		Initializer.frame.setVisible(true);
-		// When fullscreen is enabled, focus is lost
-		Renderer.canvas.requestFocus();
+			// Get the monitor, video mode, and set fullscreen
+			long monitor = glfwGetPrimaryMonitor();
+			GLFWVidMode mode = glfwGetVideoMode(monitor);
+			glfwSetWindowMonitor(Game.getWindow(), monitor, 0, 0, mode.width(), mode.height(), mode.refreshRate());
+		} else {
+			// Set window position and size based on saved values
+			glfwSetWindowMonitor(Game.getWindow(), 0, savedX, savedY, savedW, savedH, 0);
+		}
 	}
 
 	// VERY IMPORTANT METHOD!! Makes everything keep happening.
@@ -175,10 +186,10 @@ public class Updater extends Game {
 		Sound.tick();
 
 		// This is the general action statement thing! Regulates menus, mostly.
-		if (!Renderer.canvas.hasFocus()) {
+		if (!Game.hasFocus()) {
 			input.releaseAll();
 		}
-		if (Renderer.canvas.hasFocus()) {
+		if (Game.hasFocus()) {
 			gameTime++;
 
 			input.tick(); // INPUT TICK; no other class should call this, I think...especially the *Menu classes.
@@ -227,7 +238,7 @@ public class Updater extends Game {
 					} else if (isMode("minicraft.settings.mode.creative") && input.getMappedKey("SHIFT-W").isClicked()) {
 						Game.setDisplay(new LevelTransitionDisplay(1));
 					}
-					
+
 					if (input.getMappedKey("F3-L").isClicked()) {
 						// Print all players on all levels, and their coordinates.
 						Logging.WORLD.info("Printing players on all levels.");

@@ -2,9 +2,19 @@ package minicraft.core;
 
 import minicraft.core.io.FileHandler;
 import minicraft.core.io.Localization;
+import minicraft.core.io.Settings;
 import minicraft.util.Logging;
 import minicraft.util.TinylogLoggingProvider;
 import org.jetbrains.annotations.Nullable;
+import org.joml.Matrix4f;
+import org.lwjgl.BufferUtils;
+import org.lwjgl.glfw.GLFWCharCallback;
+import org.lwjgl.glfw.GLFWErrorCallback;
+import org.lwjgl.glfw.GLFWImage;
+import org.lwjgl.glfw.GLFWKeyCallback;
+import org.lwjgl.glfw.GLFWVidMode;
+import org.lwjgl.opengl.GL;
+import org.lwjgl.system.MemoryStack;
 import org.tinylog.provider.ProviderRegistry;
 
 import javax.imageio.ImageIO;
@@ -18,21 +28,57 @@ import java.awt.event.ComponentEvent;
 import java.awt.event.WindowEvent;
 import java.awt.event.WindowListener;
 import java.awt.image.BufferedImage;
+import java.awt.image.DataBufferByte;
 import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
+import java.nio.IntBuffer;
+
+import static minicraft.core.Renderer.WINDOW_SIZE;
+import static org.lwjgl.glfw.Callbacks.glfwFreeCallbacks;
+import static org.lwjgl.glfw.GLFW.GLFW_CONTEXT_VERSION_MAJOR;
+import static org.lwjgl.glfw.GLFW.GLFW_CONTEXT_VERSION_MINOR;
+import static org.lwjgl.glfw.GLFW.GLFW_FALSE;
+import static org.lwjgl.glfw.GLFW.GLFW_RESIZABLE;
+import static org.lwjgl.glfw.GLFW.GLFW_TRUE;
+import static org.lwjgl.glfw.GLFW.GLFW_VISIBLE;
+import static org.lwjgl.glfw.GLFW.glfwCreateWindow;
+import static org.lwjgl.glfw.GLFW.glfwDefaultWindowHints;
+import static org.lwjgl.glfw.GLFW.glfwDestroyWindow;
+import static org.lwjgl.glfw.GLFW.glfwGetPrimaryMonitor;
+import static org.lwjgl.glfw.GLFW.glfwGetVideoMode;
+import static org.lwjgl.glfw.GLFW.glfwGetWindowSize;
+import static org.lwjgl.glfw.GLFW.glfwInit;
+import static org.lwjgl.glfw.GLFW.glfwMakeContextCurrent;
+import static org.lwjgl.glfw.GLFW.glfwPollEvents;
+import static org.lwjgl.glfw.GLFW.glfwSetCharCallback;
+import static org.lwjgl.glfw.GLFW.glfwSetErrorCallback;
+import static org.lwjgl.glfw.GLFW.glfwSetFramebufferSizeCallback;
+import static org.lwjgl.glfw.GLFW.glfwSetKeyCallback;
+import static org.lwjgl.glfw.GLFW.glfwSetWindowFocusCallback;
+import static org.lwjgl.glfw.GLFW.glfwSetWindowIcon;
+import static org.lwjgl.glfw.GLFW.glfwSetWindowPos;
+import static org.lwjgl.glfw.GLFW.glfwShowWindow;
+import static org.lwjgl.glfw.GLFW.glfwSwapBuffers;
+import static org.lwjgl.glfw.GLFW.glfwSwapInterval;
+import static org.lwjgl.glfw.GLFW.glfwTerminate;
+import static org.lwjgl.glfw.GLFW.glfwWindowHint;
+import static org.lwjgl.glfw.GLFW.glfwWindowShouldClose;
+import static org.lwjgl.opengl.GL11.GL_FLOAT;
+import static org.lwjgl.opengl.GL30.*;
+import static org.lwjgl.system.MemoryStack.stackPush;
+import static org.lwjgl.system.MemoryUtil.NULL;
 
 public class Initializer extends Game {
 	private Initializer() {
 	}
 
 	/**
-	 * Reference to actual frame, also it may be null.
+	 * LWJGL/GLFW Stuff
 	 */
-	static JFrame frame;
+	private static GLFWKeyCallback keyCallback;
+	private static GLFWCharCallback charCallback;
 	static int fra, tik; // These store the number of frames and ticks in the previous second; used for fps, at least.
-
-	public static JFrame getFrame() {
-		return frame;
-	}
 
 	public static int getCurFps() {
 		return fra;
@@ -42,7 +88,7 @@ public class Initializer extends Game {
 		// Parses command line arguments
 		@Nullable
 		String saveDir = null;
-		boolean enableHardwareAcceleration = true;
+		boolean enableHardwareAcceleration = true; // Likely not a useful flag anymore
 		for (int i = 0; i < args.length; i++) {
 			if (args[i].equalsIgnoreCase("--savedir") && i + 1 < args.length) {
 				i++;
@@ -88,7 +134,45 @@ public class Initializer extends Game {
 		int ticks = 0;
 		long lastTimer1 = System.currentTimeMillis();
 
-		while (running) {
+		// Create an object to store a square to be used for rendering
+		vao = glGenVertexArrays();
+		glBindVertexArray(vao);
+
+		// Generate a buffer to store the 4 corners of the square
+		// has 4 vertices, in the format: pos(x y z w), texture(u v), normal(x y z)
+		int vbo = glGenBuffers();
+		glBindBuffer(GL_ARRAY_BUFFER, vbo);
+		glBufferData(GL_ARRAY_BUFFER, new float[] {
+			1.0f, 1.0f, 0.0f, 1, 1, 1, 0, 0, -1, // top right
+			1.0f, -1.0f, 0.0f, 1, 1, 0, 0, 0, -1, // bottom right
+			-1.0f, -1.0f, 0.0f, 1, 0, 0, 0, 0, -1, // bottom left
+			-1.0f,  1.0f, 0.0f, 1, 0, 1, 0, 0, -1  // top left
+		}, GL_STATIC_DRAW);
+		// Create a buffer to store the order we draw the square in.
+		// Defines two triangles, with a shared diagonal from the top left to the bottom right |\|
+		int ebo = glGenBuffers();
+		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
+		glBufferData(GL_ELEMENT_ARRAY_BUFFER, new int[] {
+			0, 1, 3, // top right triangle
+			1, 2, 3, // bottom left triangle
+		}, GL_STATIC_DRAW);
+
+		// Enable vertice attributes, i.e. tell opengl that our vertices are in pos(x y z w), texture(u v), normal(x y z) format
+		glEnableVertexAttribArray(0);
+		glVertexAttribPointer(0, 4, GL_FLOAT, false, 9*Float.BYTES, 0);
+		glEnableVertexAttribArray(1);
+		glVertexAttribPointer(1, 2, GL_FLOAT, false, 9*Float.BYTES, 4*Float.BYTES);
+		glEnableVertexAttribArray(2);
+		glVertexAttribPointer(2, 3, GL_FLOAT, false, 9*Float.BYTES, 6*Float.BYTES);
+
+		// enable transparency blending and disable depth testing
+		glEnable(GL_BLEND);
+		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+		glDisable(GL_DEPTH_TEST);
+
+
+		// Main loop!
+		while (!glfwWindowShouldClose(window)) {
 			long now = System.nanoTime();
 			double nsPerTick = 1E9D / Updater.normSpeed; // Nanosecs per sec divided by ticks per sec = nanosecs per tick
 			if (currentDisplay == null) nsPerTick /= Updater.gamespeed;
@@ -128,72 +212,86 @@ public class Initializer extends Game {
 				frames = 0; // Resets frames
 				ticks = 0; // Resets ticks; ie, frames and ticks only are per second
 			}
+
+			// Poll for input events
+			glfwPollEvents();
 		}
+
+		glfwFreeCallbacks(window);
+		glfwDestroyWindow(window);
+		glfwTerminate();
+		glfwSetErrorCallback(null).free();
 	}
 
+	// Initializes a GLFW window, hooks up input events,
+	static void init() {
+		GLFWErrorCallback.createPrint(System.err).set();
+		if(!glfwInit())
+			Logging.GAMEHANDLER.error("Could not initialize GLFW", new IllegalStateException("Unable to initialize GLFW"));
 
-	// Creates and displays the JFrame window that the game appears in.
-	static void createAndDisplayFrame() {
-		Renderer.canvas.setMinimumSize(new java.awt.Dimension(1, 1));
-		Renderer.canvas.setPreferredSize(Renderer.getWindowSize());
-		Renderer.canvas.setBackground(Color.BLACK);
-		JFrame frame = Initializer.frame = new JFrame(NAME);
-		frame.setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
-		frame.setLayout(new BorderLayout()); // Sets the layout of the window
-		frame.add(Renderer.canvas, BorderLayout.CENTER); // Adds the game (which is a canvas) to the center of the screen.
-		frame.pack(); // Squishes everything into the preferredSize.
+		glfwDefaultWindowHints();
+		// Using OpenGL 3.3 for now
+		glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+		glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+		glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
+		glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE);
 
+		window = glfwCreateWindow(Renderer.getWindowSize().width, Renderer.getWindowSize().height, NAME, NULL, NULL);
+		if(window == NULL)
+			Logging.GAMEHANDLER.error("Could not create window", new RuntimeException("Unable to create window"));
+
+		glfwSetKeyCallback(window, Game.input.glfwKeyCallback);
+
+		glfwSetCharCallback(window, Game.input.glfwCharCallback);
+
+		glfwSetFramebufferSizeCallback(window, (window, width, height) -> {
+			WINDOW_SIZE.setSize(width, height);
+		});
+
+		glfwSetWindowFocusCallback(window, (window, focus) -> {
+			focused = focus;
+		});
+
+		// Put window in the center of the screen
+		try (MemoryStack stack = stackPush()) {
+			IntBuffer pWidth = stack.mallocInt(1);
+			IntBuffer pHeight = stack.mallocInt(1);
+			glfwGetWindowSize(window, pWidth, pHeight);
+			GLFWVidMode vidmode = glfwGetVideoMode(glfwGetPrimaryMonitor());
+			glfwSetWindowPos(window, (vidmode.width() - pWidth.get(0))/2, (vidmode.height() - pHeight.get(0))/2);
+		}
+
+		// Use the window (required to start using GPU resources)
+		glfwMakeContextCurrent(window);
+
+		// Load logo, convert to GLFWImage, and set the icon
 		try {
 			BufferedImage logo = ImageIO.read(Game.class.getResourceAsStream("/resources/logo.png")); // Load the window logo
-			frame.setIconImage(logo);
+			byte[] pixels = ((DataBufferByte)logo.getRaster().getDataBuffer()).getData();
+			ByteBuffer buffer = BufferUtils.createByteBuffer(pixels.length);
+			buffer.order(ByteOrder.nativeOrder());
+			// pixels is in ABGR order, when we need RGBA order
+			for(int i = 0; i < pixels.length; i+=4) {
+				buffer.put(pixels[i + 3]);
+				buffer.put(pixels[i + 2]);
+				buffer.put(pixels[i + 1]);
+				buffer.put(pixels[i + 0]);
+			}
+
+			buffer.flip();
+			GLFWImage.Buffer gb = GLFWImage.create(1);
+			GLFWImage glfwImage = GLFWImage.create().set(logo.getWidth(), logo.getHeight(), buffer);
+			gb.put(0, glfwImage);
+			glfwSetWindowIcon(window, gb);
 		} catch (IOException e) {
 			CrashHandler.errorHandle(e);
 		}
 
-		frame.setLocationRelativeTo(null); // The window will pop up in the middle of the screen when launched.
+		glfwSwapInterval((boolean) Settings.get("vsync") ? 1 : 0);
 
-		frame.addComponentListener(new ComponentAdapter() {
-			public void componentResized(ComponentEvent e) {
-				float w = frame.getWidth() - frame.getInsets().left - frame.getInsets().right;
-				float h = frame.getHeight() - frame.getInsets().top - frame.getInsets().bottom;
-				Renderer.SCALE = Math.min(w / Renderer.WIDTH, h / Renderer.HEIGHT);
-			}
-		});
+		glfwShowWindow(window);
 
-		frame.addWindowListener(new WindowListener() {
-			public void windowActivated(WindowEvent e) {
-			}
-
-			public void windowDeactivated(WindowEvent e) {
-			}
-
-			public void windowIconified(WindowEvent e) {
-			}
-
-			public void windowDeiconified(WindowEvent e) {
-			}
-
-			public void windowOpened(WindowEvent e) {
-			}
-
-			public void windowClosed(WindowEvent e) {
-				Logging.GAMEHANDLER.debug("Window closed");
-			}
-
-			public void windowClosing(WindowEvent e) {
-				Logging.GAMEHANDLER.info("Window closing");
-				quit();
-			}
-		});
-	}
-
-	/**
-	 * Launching the main window.
-	 */
-	static void launchWindow() {
-		frame.setVisible(true);
-		frame.requestFocus();
-		Renderer.canvas.requestFocus();
+		GL.createCapabilities();
 	}
 
 	/**
