@@ -207,21 +207,14 @@ public class TutorialDisplayHandler {
 				int textWidth = Font.textWidth(lines);
 				int xPadding = Screen.w / 2 - (textWidth + 8) / 2;
 				int yPadding = Screen.h / 2 - (lines.length * 8 + 8) / 2;
-				int yPad = Screen.h / 2 - (lines.length * 8) / 2;
-				/*for (int i = 0; i < lines.length * 8 + 8; i++) { // Background.
-					for (int j = 0; j < textWidth + 8; j++) {
-						screen.pixels[xPadding + j + (yPadding + i) * Screen.w] =
-							i == 0 || i == lines.length * 8 + 7 ||
-								j == 0 || j == textWidth + 7 ? Color.WHITE : Color.BLUE;
-					}
-				}*/
+
 				screen.render(xPadding, yPadding, textWidth + 8, lines.length * 8 + 8, Color.BLUE);;
 				screen.render(xPadding, yPadding, textWidth + 8, 1, Color.WHITE);
 				screen.render(xPadding, yPadding+lines.length*8+8, textWidth + 8, 1, Color.WHITE);
 				screen.render(xPadding, yPadding, 1, lines.length * 8 + 8, Color.WHITE);;
-				screen.render(xPadding+textWidth + 8, yPadding, 1, lines.length * 8 + 8, Color.WHITE);;
+				screen.render(xPadding+textWidth + 8, yPadding, 1, lines.length * 8 + 8, Color.WHITE);
 
-				int yPad = Screen.h/2 - (lines.length * 8)/2;
+				int yPad = Screen.h / 2 - (lines.length * 8) / 2;
 				for (int i = 0; i < lines.length; i++) {
 					Font.drawCentered(lines[i], screen, yPad + 8 * i, Color.WHITE);
 				}

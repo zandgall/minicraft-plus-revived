@@ -5,7 +5,7 @@ in vec2 uv;
 uniform sampler2D texture;
 uniform sampler2D overlay;
 uniform sampler2D dither;
-uniform float tintFactor;
+uniform float darkFactor;
 uniform int currentLevel;
 uniform vec2 adjust;
 

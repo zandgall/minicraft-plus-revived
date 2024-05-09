@@ -186,7 +186,7 @@ public class Screen {
 		render(xp, yp, xt, yt, tw, th, sheet, mirrors, whiteTint, fullbright, 0);
 	}
 	// Any single pixel from the image can be rendered using this method.
-	public void render(int xp, int yp, int xt, int yt, int tw, int th, MinicraftImage sheet, int mirrors, int whiteTint, boolean fullBright, int color) {
+	public void render(int xp, int yp, int xt, int yt, int tw, int th, MinicraftImage sheet, int mirror, int whiteTint, boolean fullBright, int color) {
 		if (sheet == null) return; // Verifying that sheet is not null.
 
 		// Validation check
@@ -199,6 +199,9 @@ public class Screen {
 			yt = 0;
 		}
 
+		boolean mirrorX = (mirror & BIT_MIRROR_X) > 0; // Horizontally.
+		boolean mirrorY = (mirror & BIT_MIRROR_Y) > 0; // Vertically.
+
 		glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
 		glViewport(0, 0, width, height);
 		Shader.tile.use();
@@ -206,13 +209,24 @@ public class Screen {
 		Shader.tile.setTransform(new Matrix4f().identity().translate(xp + 4, yp + 4, 0).scale(4));
 		Shader.tile.setTexOffset(xt, yt);
 		Shader.tile.setMirror(mirrorX, mirrorY);
-		Shader.tile.setFullBright(fullbright);
+		Shader.tile.setFullBright(fullBright);
 		Shader.tile.setWhiteTint(whiteTint);
 		Shader.tile.setColor(color);
 		Shader.tile.setTexture(sheet.texture);
 		glBindVertexArray(Game.getVao());
 		glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
 
+	}
+
+	public void drawLineSpecial(int x, int y, int l, int axis) {
+		switch(axis) {
+			case 0:
+				render(x, y, l, 1, 0xfffff); // Will need to add a shader for the 'special' coloring
+				break;
+			case 1:
+				render(x, y, 1, l, 0xfffff);
+				break;
+		}
 	}
 
 	/**
@@ -275,7 +289,7 @@ public class Screen {
 	 * Overlays the screen with pixels
 	 */
 	public void overlay(Screen screen2, int currentLevel, int xa, int ya) {
-		double tintFactor = getTintFactor(currentLevel);
+		double darkFactor = getDarkFactor(currentLevel);
 
 		glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
 		glViewport(0, 0, width, height);
@@ -284,7 +298,7 @@ public class Screen {
 		Shader.overlay.setTransform(new Matrix4f().identity()
 			.translate(width / 2.f, height / 2.f, 0)
 			.scale(width / 2.f, height / 2.f, 1));
-		Shader.overlay.setTintFactor((float)tintFactor/255.f);
+		Shader.overlay.setDarkFactor((float)darkFactor/255.f);
 		Shader.overlay.setCurrentLevel(currentLevel);
 		Shader.overlay.setAdjust(xa, ya);
 		Shader.overlay.setTexture(texture);
@@ -294,8 +308,8 @@ public class Screen {
 		glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
 	}
 
-	private static double getTintFactor(int currentLevel) {
-		double tintFactor = 0;
+	private static double getDarkFactor(int currentLevel) {
+		double darkFactor = 0;
 		if (currentLevel >= 3 && currentLevel < 5) {
 			int transTime = Updater.dayLength / 4;
 			double relTime = (Updater.tickCount % transTime) * 1.0 / transTime;
@@ -317,8 +331,8 @@ public class Screen {
 
 			if (currentLevel > 3) darkFactor -= (darkFactor < 10 ? darkFactor : 10);
 		} else if (currentLevel >= 5)
-			tintFactor = -MAXDARK;
-		return tintFactor;
+			darkFactor = -MAXDARK;
+		return darkFactor;
 	}
 
 	public void renderLight(int x, int y, int r) {

@@ -1,11 +1,14 @@
 package minicraft.gfx;
 
+import org.jetbrains.annotations.NotNull;
+
 import minicraft.gfx.SpriteLinker.LinkedSprite;
 import org.lwjgl.BufferUtils;
 
 import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.Objects;
 
 import static org.lwjgl.opengl.GL30.*;
 
@@ -35,7 +38,7 @@ public class MinicraftImage {
 
 		this.width = width;
 		this.height = height;
-		pixels = new int[width * height];
+		this.texture = 0;
 	}
 
 	/**
@@ -91,6 +94,8 @@ public class MinicraftImage {
 		}
 		buffer.flip();
 
+		this.width = width;
+		this.height = height;
 		texture = glGenTextures();
 		glBindTexture(GL_TEXTURE_2D, texture);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);

@@ -272,7 +272,8 @@ public class OnScreenKeyboardMenu extends Menu {
 		screen.render(x, y+renderingTop, width, 2, 0xFFEFEFEF);
 
 		final int keyHeight = 14;
-		final int keyWidth = 16;
+		final int defaultKeyWidth = 16;
+		int keyWidth = 16;
 		VirtualKey[][] keys = shiftPressed ? keysB : keysF;
 		MinicraftImage sheet = Renderer.spriteLinker.getSheet(SpriteLinker.SpriteType.Gui, "osk");
 		for (int r = 0; r < keys.length; r++) {
@@ -280,7 +281,7 @@ public class OnScreenKeyboardMenu extends Menu {
 			totalLength += keyWidth * 2 * (int) Stream.of(keys[r]).filter(k -> k == spaceBar).count();
 			totalLength += keyWidth * (int) Stream.of(keys[r]).filter(k -> k == shiftKey).count();
 			int xOffset = (Screen.w - totalLength) / 2;
-			int y = top + 2 + r * keyHeight;
+			int y = renderingTop + 2 + r * keyHeight;
 			int x = xOffset;
 			for (int c = 0; c < keys[r].length; c++) {
 				VirtualKey key = keys[r][c];

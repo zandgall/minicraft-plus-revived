@@ -129,7 +129,7 @@ public class Shader {
 			glUseProgram(0);
 		}
 
-		public void setTintFactor(float tintFactor) {glUniform1f(uniformLocation("tintFactor"), tintFactor);}
+		public void setDarkFactor(float tintFactor) {glUniform1f(uniformLocation("daskFactor"), tintFactor);}
 
 		public void setCurrentLevel(int currentLevel) {glUniform1i(uniformLocation("currentLevel"), currentLevel);}
 

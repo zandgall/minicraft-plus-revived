@@ -59,6 +59,8 @@ project(":client") {
         implementation 'com.badlogicgames.gdx:gdx-controllers:1.9.13'
         implementation 'com.badlogicgames.jamepad:jamepad:2.0.20.0'
 
+        implementation 'org.jetbrains:annotations:23.0.0'
+
         implementation platform("org.lwjgl:lwjgl-bom:3.3.2")
 
         implementation "org.joml:joml:1.10.5"
