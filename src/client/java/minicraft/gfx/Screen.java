@@ -1,10 +1,13 @@
 package minicraft.gfx;
 
+import minicraft.core.Game;
 import minicraft.core.Renderer;
 import minicraft.core.Updater;
+import minicraft.core.io.Shader;
 import minicraft.gfx.SpriteLinker.LinkedSprite;
 import minicraft.gfx.SpriteLinker.SpriteType;
 import org.intellij.lang.annotations.MagicConstant;
+import org.joml.Matrix4f;
 
 import java.awt.AlphaComposite;
 import java.awt.Graphics2D;
@@ -16,6 +19,8 @@ import java.math.BigDecimal;
 import java.math.MathContext;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+
+import static org.lwjgl.opengl.GL33.*;
 
 public class Screen {
 
@@ -33,28 +38,28 @@ public class Screen {
 	private static final int BIT_MIRROR_X = 0x01; // Written in hexadecimal; binary: 01
 	private static final int BIT_MIRROR_Y = 0x02; // Binary: 10
 
-	private final BufferedImage image;
-	private final int[] pixels;
+	private final int texture;
 
 	private final ArrayDeque<Rendering> renderings = new ArrayDeque<>();
 	private final LightOverlay lightOverlay;
 	private ClearRendering lastClearRendering = null;
+
+
 
 	// Outdated Information:
 	// Since each sheet is 256x256 pixels, each one has 1024 8x8 "tiles"
 	// So 0 is the start of the item sheet 1024 the start of the tile sheet, 2048 the start of the entity sheet,
 	// And 3072 the start of the gui sheet
 
-	public Screen(BufferedImage image) {
+	public Screen(int texture) {
 		/// Screen width and height are determined by the actual game window size, meaning the screen is only as big as the window.buffer = new BufferedImage(Screen.w, Screen.h);
-		this.image = image;
-		pixels = ((DataBufferInt) image.getRaster().getDataBuffer()).getData();
+		this.texture = texture;
 		lightOverlay = new LightOverlay();
 	}
 
 	private interface Rendering {
 		/** Invoked by {@link Renderer#render()}. */
-		void render(Graphics2D graphics);
+		void render();
 	}
 
 	private void queue(Rendering rendering) {
@@ -71,23 +76,23 @@ public class Screen {
 		}
 
 		@Override
-		public void render(Graphics2D graphics) {
-
-			graphics.setColor(new java.awt.Color(color));
-			graphics.fillRect(0, 0, Screen.w, Screen.h);
+		public void render() {
+			glClearColor(((color>>16)&0xff)/255.f, ((color>>8)&0xff)/255.f, (color&0xff)/255.f, ((color>>24)&0xff)/255.f);
+			glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 		}
 	}
 
 	private static class PlainClearRendering extends ClearRendering {
 		@Override
-		public void render(Graphics2D graphics) {
-			graphics.clearRect(0, 0, Screen.w, Screen.h);
+		public void render() {
+			glClearColor(0, 0, 0, 1);
+			glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 		}
 	}
 
 	private class SpriteRendering implements Rendering {
-		private final int xp, yp, xt, yt, tw, th, mirrors, whiteTint, color;
-		private final boolean fullBright;
+		private final int xp, yp, xt, yt, tw, th, whiteTint, color;
+		private final boolean fullBright, mirrorX, mirrorY;
 		private final MinicraftImage sheet;
 
 		public SpriteRendering(int xp, int yp, int xt, int yt, int tw, int th,
@@ -98,7 +103,8 @@ public class Screen {
 			this.yt = yt;
 			this.tw = tw;
 			this.th = th;
-			this.mirrors = mirrors;
+			this.mirrorX = (mirrors & BIT_MIRROR_X) > 0;
+			this.mirrorY = (mirrors & BIT_MIRROR_Y) > 0;
 			this.whiteTint = whiteTint;
 			this.fullBright = fullBright;
 			this.color = color;
@@ -106,40 +112,17 @@ public class Screen {
 		}
 
 		@Override
-		public void render(Graphics2D graphics) {
-			int toffs = xt + yt * sheet.width;
-			// Determines if the image should be mirrored...
-			boolean mirrorX = (mirrors & BIT_MIRROR_X) > 0; // Horizontally.
-			boolean mirrorY = (mirrors & BIT_MIRROR_Y) > 0; // Vertically.
-			for (int y = 0; y < th; ++y) { // Relative
-				if (y + yp < 0) continue; // If the pixel is out of bounds, then skip the rest of the loop.
-				if (y + yp >= h) break;
-				int sy = mirrorY ? th - 1 - y : y; // Source relative; reverse if necessary
-				for (int x = 0; x < tw; ++x) { // Relative
-					if (x + xp < 0) continue; // Skip rest if out of bounds.
-					if (x + xp >= w) break;
-					int sx = mirrorX ? tw - 1 - x : x; // Source relative; reverse if necessary
-					int col = sheet.pixels[toffs + sx + sy * sheet.width]; // Gets the color of the current pixel from the value stored in the sheet.
-					if (col >> 24 != 0) { // if not transparent
-						int index = (xp + x) + (yp + y) * w;
-						if (whiteTint != -1 && col == 0x1FFFFFF) {
-							// If this is white, write the whiteTint over it
-							pixels[index] = Color.upgrade(whiteTint);
-						} else {
-							// Inserts the colors into the image
-							if (fullBright) {
-								pixels[index] = Color.WHITE;
-							} else {
-								if (color != 0) {
-									pixels[index] = color;
-								} else {
-									pixels[index] = Color.upgrade(col);
-								}
-							}
-						}
-					}
-				}
-			}
+		public void render() {
+			Shader.tile.use();
+			Shader.tile.setTransform(new Matrix4f().identity().translate(xp + 4, yp + 4, 0).scale(4));
+			Shader.tile.setTexOffset(xt, yt);
+			Shader.tile.setMirror(mirrorX, mirrorY);
+			Shader.tile.setFullBright(fullBright);
+			Shader.tile.setWhiteTint(whiteTint);
+			Shader.tile.setColor(color);
+			Shader.tile.setTexture(sheet.texture);
+			glBindVertexArray(Game.getVao());
+			glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
 		}
 	}
 
@@ -155,9 +138,12 @@ public class Screen {
 		}
 
 		@Override
-		public void render(Graphics2D graphics) {
-			graphics.setColor(new java.awt.Color(color));
-			graphics.fillRect(xp, yp, w, h);
+		public void render() {
+			Shader.fillRect.use();
+			Shader.fillRect.setTransform(new Matrix4f().identity().translate(xp+w*0.5f, yp+h*0.5f, 0).scale(w*0.5f, h*0.5f, 1));
+			Shader.fillRect.setColor(color);
+			glBindVertexArray(Game.getVao());
+			glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
 		}
 	}
 
@@ -173,9 +159,12 @@ public class Screen {
 		}
 
 		@Override
-		public void render(Graphics2D graphics) {
-			graphics.setColor(new java.awt.Color(color));
-			graphics.drawRect(xp, yp, w, h);
+		public void render() {
+			Shader.drawRect.use();
+			Shader.drawRect.setTransform(new Matrix4f().identity().translate(xp+w*0.5f, yp+h*0.5f, 0).scale(w*0.5f, h*0.5f, 1));
+			Shader.drawRect.setColor(color);
+			glBindVertexArray(Game.getVao());
+			glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
 		}
 	}
 
@@ -192,8 +181,11 @@ public class Screen {
 
 		@Override
 		public void render(Graphics2D graphics) {
-			graphics.setColor(new java.awt.Color(color));
-			graphics.drawLine(x0, y0, x1, y1);
+			Shader.drawLine.use();
+			Shader.drawLine.setPoints(x0, y0, x1, y1);
+			Shader.drawLine.setColor(color);
+			glBindVertexArray(Game.getVao());
+			glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
 		}
 	}
 
@@ -211,20 +203,12 @@ public class Screen {
 
 		@Override
 		public void render(Graphics2D graphics) {
-			switch (axis) {
-				case 0:
-					for (int i = 0; i < l; i++) { // 1 pixel high and 8 pixel wide
-						int idx = x0 + i + y0 * Screen.w;
-						pixels[idx] = Color.getLightnessFromRGB(pixels[idx]) >= .5 ? Color.BLACK : Color.WHITE;
-					}
-					break;
-				case 1:
-					for (int i = 0; i < l; i++) { // 8 pixel high and 1 pixel wide
-						int idx = x0 + (y0 + i) * Screen.w;
-						pixels[idx] = Color.getLightnessFromRGB(pixels[idx]) >= .5 ? Color.BLACK : Color.WHITE;
-					}
-					break;
-			}
+			Shader.drawLineSpecial.use();
+			Shader.drawLineSpecial.setPoints(x0, y0, x0 + l*(1-axis), y0 + l*axis);
+			Shader.drawLineSpecial.setColor(color);
+			Shader.drawLineSpecial.setTexture(texture); // Reference the currently drawn screen texture
+			glBindVertexArray(Game.getVao());
+			glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
 		}
 	}
 

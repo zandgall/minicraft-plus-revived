@@ -92,7 +92,7 @@ public class Renderer extends Game {
 
 	public static Screen screen; // Creates the main screen
 	public static SpriteLinker spriteLinker = new SpriteLinker(); // The sprite linker for sprites
-	private static long texture; // Creates a texture to be displayed on the screen.
+	private static int texture; // Creates a texture to be displayed on the screen.
 
 	public static boolean readyToRenderGameplay = false;
 	public static boolean showDebugInfo = false;

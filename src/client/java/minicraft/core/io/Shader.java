@@ -14,7 +14,9 @@ import static org.lwjgl.opengl.GL30.*;
 
 public class Shader {
 
-	public static TileShader tile;
+	// TODO: overhaul the types of shaders used
+
+	public static TileShader tile; // TODO: TileShader -> SpriteShader
 	public static OverlayShader overlay;
 	public static PassthroughShader passthrough;
 	public static PostprocessShader postprocess;
