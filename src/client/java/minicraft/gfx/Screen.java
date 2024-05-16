@@ -24,6 +24,8 @@ import static org.lwjgl.opengl.GL33.*;
 
 public class Screen {
 
+	private static int dither = 0; // initialized as 0, set in first initialization of a Screen
+
 	public static final int w = Renderer.WIDTH; // Width of the screen
 	public static final int h = Renderer.HEIGHT; // Height of the screen
 	public static final Point center = new Point(w / 2, h / 2);
@@ -38,7 +40,8 @@ public class Screen {
 	private static final int BIT_MIRROR_X = 0x01; // Written in hexadecimal; binary: 01
 	private static final int BIT_MIRROR_Y = 0x02; // Binary: 10
 
-	private final int texture;
+	// OpenGL texture and rendering framebuffer
+	private final int texture, framebuffer;
 
 	private final ArrayDeque<Rendering> renderings = new ArrayDeque<>();
 	private final LightOverlay lightOverlay;
@@ -54,7 +57,22 @@ public class Screen {
 	public Screen(int texture) {
 		/// Screen width and height are determined by the actual game window size, meaning the screen is only as big as the window.buffer = new BufferedImage(Screen.w, Screen.h);
 		this.texture = texture;
+		framebuffer = GLHelper.createFramebuffer();
+		GLHelper.makeFramebufferDrawTo(framebuffer, texture);
 		lightOverlay = new LightOverlay();
+
+		if(dither == 0) {
+			dither = GLHelper.createAndBindTexture(4, 4, GL_RED);
+			GLHelper.bindTextureData(dither, 4, 4, GL_RED, new byte[]{
+				0, 80, 20, 100,
+				120, 40, (byte) 140, 60,
+				30, 110, 10, 90,
+				(byte) 150, 70, (byte) 130, 50});
+		}
+	}
+
+	public int getTexture() {
+		return texture;
 	}
 
 	private interface Rendering {
@@ -113,16 +131,16 @@ public class Screen {
 
 		@Override
 		public void render() {
-			Shader.tile.use();
-			Shader.tile.setTransform(new Matrix4f().identity().translate(xp + 4, yp + 4, 0).scale(4));
-			Shader.tile.setTexOffset(xt, yt);
-			Shader.tile.setMirror(mirrorX, mirrorY);
-			Shader.tile.setFullBright(fullBright);
-			Shader.tile.setWhiteTint(whiteTint);
-			Shader.tile.setColor(color);
-			Shader.tile.setTexture(sheet.texture);
-			glBindVertexArray(Game.getVao());
-			glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+			Shader.sprite.use();
+			Shader.sprite.setPosition(xp, yp);
+			Shader.sprite.setTexOffset(xt, yt);
+			Shader.sprite.setTexSize(tw, th);
+			Shader.sprite.setMirror(mirrorX, mirrorY);
+			Shader.sprite.setFullBright(fullBright);
+			Shader.sprite.setWhiteTint(whiteTint);
+			Shader.sprite.setColor(color);
+			Shader.sprite.setTexture(sheet.texture);
+			GLHelper.drawSquare();
 		}
 	}
 
@@ -139,11 +157,10 @@ public class Screen {
 
 		@Override
 		public void render() {
-			Shader.fillRect.use();
-			Shader.fillRect.setTransform(new Matrix4f().identity().translate(xp+w*0.5f, yp+h*0.5f, 0).scale(w*0.5f, h*0.5f, 1));
-			Shader.fillRect.setColor(color);
-			glBindVertexArray(Game.getVao());
-			glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+			Shader.rect.use();
+			Shader.rect.setRectangle(xp, yp, w, h);
+			Shader.rect.setColor(color);
+			GLHelper.drawSquare();
 		}
 	}
 
@@ -160,11 +177,17 @@ public class Screen {
 
 		@Override
 		public void render() {
-			Shader.drawRect.use();
-			Shader.drawRect.setTransform(new Matrix4f().identity().translate(xp+w*0.5f, yp+h*0.5f, 0).scale(w*0.5f, h*0.5f, 1));
-			Shader.drawRect.setColor(color);
-			glBindVertexArray(Game.getVao());
-			glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+			Shader.rect.use();
+			Shader.rect.setColor(color);
+
+			Shader.rect.setRectangle(xp, yp, w, 1);
+			GLHelper.drawSquare();
+			Shader.rect.setRectangle(xp, yp, 1, h);
+			GLHelper.drawSquare();
+			Shader.rect.setRectangle(xp, yp+h-1, w, 1);
+			GLHelper.drawSquare();
+			Shader.rect.setRectangle(xp+w-1, yp, 1, h);
+			GLHelper.drawSquare();
 		}
 	}
 
@@ -180,10 +203,10 @@ public class Screen {
 		}
 
 		@Override
-		public void render(Graphics2D graphics) {
-			Shader.drawLine.use();
-			Shader.drawLine.setPoints(x0, y0, x1, y1);
-			Shader.drawLine.setColor(color);
+		public void render() {
+			Shader.line.use();
+			Shader.line.setPoints(x0, y0, x1, y1);
+			Shader.line.setColor(color);
 			glBindVertexArray(Game.getVao());
 			glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
 		}
@@ -202,11 +225,10 @@ public class Screen {
 		}
 
 		@Override
-		public void render(Graphics2D graphics) {
-			Shader.drawLineSpecial.use();
-			Shader.drawLineSpecial.setPoints(x0, y0, x0 + l*(1-axis), y0 + l*axis);
-			Shader.drawLineSpecial.setColor(color);
-			Shader.drawLineSpecial.setTexture(texture); // Reference the currently drawn screen texture
+		public void render() {
+			Shader.lineSpecial.use();
+			Shader.lineSpecial.setPoints(x0, y0, x0 + l*(1-axis), y0 + l*axis);
+			Shader.lineSpecial.setTexture(texture); // Reference the currently drawn screen texture
 			glBindVertexArray(Game.getVao());
 			glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
 		}
@@ -224,14 +246,16 @@ public class Screen {
 		}
 
 		@Override
-		public void render(Graphics2D graphics) {
+		public void render() {
 			double alpha = lightOverlay.getOverlayOpacity(currentLevel, darkFactor);
-			BufferedImage overlay = lightOverlay.render(xa, ya);
-			graphics.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, .02f)); // Lightening
-			graphics.setColor(java.awt.Color.WHITE);
-			graphics.fillRect(0, 0, w, h);
-			graphics.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, (float) alpha)); // Shaders
-			graphics.drawImage(overlay, null, 0, 0);
+			int overlay = lightOverlay.render();
+			Shader.overlay.use();
+			Shader.overlay.setAdjust(xa, ya);
+			Shader.overlay.setAlpha(alpha);
+			Shader.overlay.setOverlay(overlay);
+			Shader.overlay.setTexture(texture);
+			Shader.overlay.setDither(dither);
+			GLHelper.drawSquare();
 		}
 	}
 
@@ -253,15 +277,17 @@ public class Screen {
 	}
 
 	public void flush() {
-		Graphics2D g2d = image.createGraphics();
+// 		Graphics2D g2d = image.createGraphics();
+		GLHelper.startDrawingToFramebuffer(framebuffer, Renderer.WIDTH, Renderer.HEIGHT);
 		Rendering rendering;
 		do { // Skips until the latest clear rendering is obtained.
 			rendering = renderings.poll(); // This can prevent redundant renderings operated.
 			if (rendering == null) return;
 		} while (rendering != lastClearRendering);
 		do { // Renders all renderings until all are operated.
-			rendering.render(g2d);
+			rendering.render();
 		} while ((rendering = renderings.poll()) != null);
+		GLHelper.stopDrawingToFramebuffer();
 	}
 
 	public void render(int xp, int yp, int xt, int yt, int bits, MinicraftImage sheet) {
@@ -449,7 +475,7 @@ public class Screen {
 	}
 
 	private static class LightOverlay {
-		private static final int[] dither = new int[] {
+		/* private static final int[] dither = new int[] {
 			0, 8, 2, 10,
 			12, 4, 14, 6,
 			3, 11, 1, 9,
@@ -461,8 +487,10 @@ public class Screen {
 		public final BufferedImage buffer = new BufferedImage(w, h, BufferedImage.TYPE_BYTE_GRAY);
 		public final byte[] bufPixels;
 		public final BufferedImage overlay = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB);
-		public final int[] olPixels;
+		public final int[] olPixels;*/
 		public final ArrayDeque<LightRadius> lights = new ArrayDeque<>();
+
+		public final int texture, framebuffer;
 
 		private static class LightRadius {
 			public final int x, y, r;
@@ -474,7 +502,11 @@ public class Screen {
 		}
 
 		public LightOverlay() {
-			bufPixels = ((DataBufferByte) buffer.getRaster().getDataBuffer()).getData();
+			texture = GLHelper.createAndBindTexture(w, h, GL_RGBA);
+			framebuffer = GLHelper.createFramebuffer();
+			GLHelper.makeFramebufferDrawTo(framebuffer, texture);
+
+			/* bufPixels = ((DataBufferByte) buffer.getRaster().getDataBuffer()).getData();
 			olPixels = ((DataBufferInt) overlay.getRaster().getDataBuffer()).getData();
 			ArrayList<Float> graFractions = new ArrayList<>();
 			ArrayList<java.awt.Color> graColors = new ArrayList<>();
@@ -486,7 +518,7 @@ public class Screen {
 			}
 			this.graFractions = new float[graFractions.size()];
 			for (int i = 0; i < graFractions.size(); ++i) this.graFractions[i] = graFractions.get(i);
-			this.graColors = graColors.toArray(new java.awt.Color[0]);
+			this.graColors = graColors.toArray(new java.awt.Color[0]); */
 		}
 
 		/**
@@ -510,19 +542,29 @@ public class Screen {
 			lights.add(new LightRadius(x, y, r));
 		}
 
-		public BufferedImage render(int xa, int ya) {
-			Graphics2D g2d = buffer.createGraphics();
-			g2d.setBackground(java.awt.Color.BLACK);
-			g2d.clearRect(0, 0, w, h);
+		public int render() {
+
+			GLHelper.startDrawingToFramebuffer(framebuffer, w, h);
+			glClearColor(0,0,0,0);
+			glClear(GL_COLOR_BUFFER_BIT);
+
+			Shader.lighting.use();
+			Shader.lighting.setScreenSize(w, h);
+
 			LightRadius lightRadius;
 			while ((lightRadius = lights.poll()) != null) {
 				int x = lightRadius.x, y = lightRadius.y, r = lightRadius.r;
-				g2d.setPaint(new RadialGradientPaint(x, y, r, graFractions, graColors));
-				g2d.fillOval(x - r, y - r, r * 2, r * 2);
+// 				g2d.setPaint(new RadialGradientPaint(x, y, r, graFractions, graColors));
+// 				g2d.fillOval(x - r, y - r, r * 2, r * 2);
+				Shader.lighting.setRadius(r);
+				Shader.lighting.setCenter(x, y);
+				GLHelper.drawSquare();
 			}
-			g2d.dispose();
 
-			for (int x = 0; x < w; ++x) {
+			GLHelper.stopDrawingToFramebuffer();
+// 			g2d.dispose();
+
+			/*for (int x = 0; x < w; ++x) {
 				for (int y = 0; y < h; ++y) {
 					int i = x + y * w;
 					// Grade of lightness
@@ -534,8 +576,8 @@ public class Screen {
 						olPixels[i] = 0;
 					}
 				}
-			}
-			return overlay;
+			}*/
+			return texture;
 		}
 	}
 }

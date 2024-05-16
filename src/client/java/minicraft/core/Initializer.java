@@ -18,15 +18,7 @@ import org.lwjgl.system.MemoryStack;
 import org.tinylog.provider.ProviderRegistry;
 
 import javax.imageio.ImageIO;
-import javax.swing.JFrame;
-import javax.swing.WindowConstants;
 
-import java.awt.BorderLayout;
-import java.awt.Color;
-import java.awt.event.ComponentAdapter;
-import java.awt.event.ComponentEvent;
-import java.awt.event.WindowEvent;
-import java.awt.event.WindowListener;
 import java.awt.image.BufferedImage;
 import java.awt.image.DataBufferByte;
 import java.io.IOException;
@@ -36,35 +28,7 @@ import java.nio.IntBuffer;
 
 import static minicraft.core.Renderer.WINDOW_SIZE;
 import static org.lwjgl.glfw.Callbacks.glfwFreeCallbacks;
-import static org.lwjgl.glfw.GLFW.GLFW_CONTEXT_VERSION_MAJOR;
-import static org.lwjgl.glfw.GLFW.GLFW_CONTEXT_VERSION_MINOR;
-import static org.lwjgl.glfw.GLFW.GLFW_FALSE;
-import static org.lwjgl.glfw.GLFW.GLFW_RESIZABLE;
-import static org.lwjgl.glfw.GLFW.GLFW_TRUE;
-import static org.lwjgl.glfw.GLFW.GLFW_VISIBLE;
-import static org.lwjgl.glfw.GLFW.glfwCreateWindow;
-import static org.lwjgl.glfw.GLFW.glfwDefaultWindowHints;
-import static org.lwjgl.glfw.GLFW.glfwDestroyWindow;
-import static org.lwjgl.glfw.GLFW.glfwGetPrimaryMonitor;
-import static org.lwjgl.glfw.GLFW.glfwGetVideoMode;
-import static org.lwjgl.glfw.GLFW.glfwGetWindowSize;
-import static org.lwjgl.glfw.GLFW.glfwInit;
-import static org.lwjgl.glfw.GLFW.glfwMakeContextCurrent;
-import static org.lwjgl.glfw.GLFW.glfwPollEvents;
-import static org.lwjgl.glfw.GLFW.glfwSetCharCallback;
-import static org.lwjgl.glfw.GLFW.glfwSetErrorCallback;
-import static org.lwjgl.glfw.GLFW.glfwSetFramebufferSizeCallback;
-import static org.lwjgl.glfw.GLFW.glfwSetKeyCallback;
-import static org.lwjgl.glfw.GLFW.glfwSetWindowFocusCallback;
-import static org.lwjgl.glfw.GLFW.glfwSetWindowIcon;
-import static org.lwjgl.glfw.GLFW.glfwSetWindowPos;
-import static org.lwjgl.glfw.GLFW.glfwShowWindow;
-import static org.lwjgl.glfw.GLFW.glfwSwapBuffers;
-import static org.lwjgl.glfw.GLFW.glfwSwapInterval;
-import static org.lwjgl.glfw.GLFW.glfwTerminate;
-import static org.lwjgl.glfw.GLFW.glfwWindowHint;
-import static org.lwjgl.glfw.GLFW.glfwWindowShouldClose;
-import static org.lwjgl.opengl.GL11.GL_FLOAT;
+import static org.lwjgl.glfw.GLFW.*;
 import static org.lwjgl.opengl.GL30.*;
 import static org.lwjgl.system.MemoryStack.stackPush;
 import static org.lwjgl.system.MemoryUtil.NULL;
@@ -73,11 +37,6 @@ public class Initializer extends Game {
 	private Initializer() {
 	}
 
-	/**
-	 * LWJGL/GLFW Stuff
-	 */
-	private static GLFWKeyCallback keyCallback;
-	private static GLFWCharCallback charCallback;
 	static int fra, tik; // These store the number of frames and ticks in the previous second; used for fps, at least.
 
 	public static int getCurFps() {
@@ -133,37 +92,6 @@ public class Initializer extends Game {
 		int frames = 0;
 		int ticks = 0;
 		long lastTimer1 = System.currentTimeMillis();
-
-		// Create an object to store a square to be used for rendering
-		vao = glGenVertexArrays();
-		glBindVertexArray(vao);
-
-		// Generate a buffer to store the 4 corners of the square
-		// has 4 vertices, in the format: pos(x y z w), texture(u v), normal(x y z)
-		int vbo = glGenBuffers();
-		glBindBuffer(GL_ARRAY_BUFFER, vbo);
-		glBufferData(GL_ARRAY_BUFFER, new float[] {
-			1.0f, 1.0f, 0.0f, 1, 1, 1, 0, 0, -1, // top right
-			1.0f, -1.0f, 0.0f, 1, 1, 0, 0, 0, -1, // bottom right
-			-1.0f, -1.0f, 0.0f, 1, 0, 0, 0, 0, -1, // bottom left
-			-1.0f,  1.0f, 0.0f, 1, 0, 1, 0, 0, -1  // top left
-		}, GL_STATIC_DRAW);
-		// Create a buffer to store the order we draw the square in.
-		// Defines two triangles, with a shared diagonal from the top left to the bottom right |\|
-		int ebo = glGenBuffers();
-		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
-		glBufferData(GL_ELEMENT_ARRAY_BUFFER, new int[] {
-			0, 1, 3, // top right triangle
-			1, 2, 3, // bottom left triangle
-		}, GL_STATIC_DRAW);
-
-		// Enable vertice attributes, i.e. tell opengl that our vertices are in pos(x y z w), texture(u v), normal(x y z) format
-		glEnableVertexAttribArray(0);
-		glVertexAttribPointer(0, 4, GL_FLOAT, false, 9*Float.BYTES, 0);
-		glEnableVertexAttribArray(1);
-		glVertexAttribPointer(1, 2, GL_FLOAT, false, 9*Float.BYTES, 4*Float.BYTES);
-		glEnableVertexAttribArray(2);
-		glVertexAttribPointer(2, 3, GL_FLOAT, false, 9*Float.BYTES, 6*Float.BYTES);
 
 		// enable transparency blending and disable depth testing
 		glEnable(GL_BLEND);
@@ -223,6 +151,39 @@ public class Initializer extends Game {
 		glfwSetErrorCallback(null).free();
 	}
 
+	static void initSquareVAO() {
+		// Create an object to store a square to be used for rendering
+		vao = glGenVertexArrays();
+		glBindVertexArray(vao);
+
+		// Generate a buffer to store the 4 corners of the square
+		// has 4 vertices, in the format: pos(x y z w), texture(u v), normal(x y z)
+		int vbo = glGenBuffers();
+		glBindBuffer(GL_ARRAY_BUFFER, vbo);
+		glBufferData(GL_ARRAY_BUFFER, new float[] {
+			1.0f, 1.0f, 0.0f, 1, 1, 1, 0, 0, -1, // top right
+			1.0f, -1.0f, 0.0f, 1, 1, 0, 0, 0, -1, // bottom right
+			-1.0f, -1.0f, 0.0f, 1, 0, 0, 0, 0, -1, // bottom left
+			-1.0f,  1.0f, 0.0f, 1, 0, 1, 0, 0, -1  // top left
+		}, GL_STATIC_DRAW);
+		// Create a buffer to store the order we draw the square in.
+		// Defines two triangles, with a shared diagonal from the top left to the bottom right |\|
+		int ebo = glGenBuffers();
+		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
+		glBufferData(GL_ELEMENT_ARRAY_BUFFER, new int[] {
+			0, 1, 3, // top right triangle
+			1, 2, 3, // bottom left triangle
+		}, GL_STATIC_DRAW);
+
+		// Enable vertice attributes, i.e. tell opengl that our vertices are in pos(x y z w), texture(u v), normal(x y z) format
+		glEnableVertexAttribArray(0);
+		glVertexAttribPointer(0, 4, GL_FLOAT, false, 9*Float.BYTES, 0);
+		glEnableVertexAttribArray(1);
+		glVertexAttribPointer(1, 2, GL_FLOAT, false, 9*Float.BYTES, 4*Float.BYTES);
+		glEnableVertexAttribArray(2);
+		glVertexAttribPointer(2, 3, GL_FLOAT, false, 9*Float.BYTES, 6*Float.BYTES);
+	}
+
 	// Initializes a GLFW window, hooks up input events,
 	static void init() {
 		GLFWErrorCallback.createPrint(System.err).set();
@@ -240,9 +201,9 @@ public class Initializer extends Game {
 		if(window == NULL)
 			Logging.GAMEHANDLER.error("Could not create window", new RuntimeException("Unable to create window"));
 
-		glfwSetKeyCallback(window, Game.input.glfwKeyCallback);
+		glfwSetKeyCallback(window, (window, key, scancode, action, mods) -> Game.input.glfwKeyCallback(window, key, scancode, action, mods));
 
-		glfwSetCharCallback(window, Game.input.glfwCharCallback);
+		glfwSetCharCallback(window, (window, key) -> Game.input.glfwCharCallback(window, key));
 
 		glfwSetFramebufferSizeCallback(window, (window, width, height) -> {
 			WINDOW_SIZE.setSize(width, height);
@@ -292,6 +253,8 @@ public class Initializer extends Game {
 		glfwShowWindow(window);
 
 		GL.createCapabilities();
+
+		initSquareVAO();
 	}
 
 	/**

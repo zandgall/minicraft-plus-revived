@@ -9,6 +9,7 @@ import minicraft.core.io.Settings;
 import minicraft.core.io.Sound;
 import minicraft.gfx.Color;
 import minicraft.gfx.Font;
+import minicraft.gfx.GLHelper;
 import minicraft.gfx.MinicraftImage;
 import minicraft.gfx.Point;
 import minicraft.gfx.Rectangle;
@@ -39,6 +40,8 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.function.IntPredicate;
 import java.util.stream.Collectors;
+
+import static org.lwjgl.opengl.GL11.GL_RGBA;
 
 public class QuestsDisplay extends Display {
 	/**
@@ -306,8 +309,7 @@ public class QuestsDisplay extends Display {
 			private final int rasterX;
 			private final int rasterY;
 			private final MinicraftImage image;
-			private final int[] rasterPixels;
-			private final Screen simulatedRasterScreen = new Screen(new BufferedImage(Screen.w, Screen.h, BufferedImage.TYPE_INT_RGB)) {
+			private final Screen simulatedRasterScreen;/* = new Screen(new BufferedImage(Screen.w, Screen.h, BufferedImage.TYPE_INT_RGB)) {
 				@Override
 				public void render(int xp, int yp, int xt, int yt, int bits, MinicraftImage sheet, int whiteTint, boolean fullbright, int color) {
 					if (sheet == null) return; // Verifying that sheet is not null.
@@ -348,7 +350,7 @@ public class QuestsDisplay extends Display {
 						}
 					}
 				}
-			};
+			};*/
 
 			private int cursorX = 0;
 			private int cursorY = 0;
@@ -425,8 +427,8 @@ public class QuestsDisplay extends Display {
 				Rectangle menuBounds = menus[1].getBounds();
 				rasterWidth = menuBounds.getWidth() - MinicraftImage.boxWidth * 2;
 				rasterHeight = menuBounds.getHeight() - MinicraftImage.boxWidth * 2;
-				image = new MinicraftImage(rasterWidth, rasterHeight);
-				rasterPixels = image.pixels;
+				simulatedRasterScreen = new Screen(GLHelper.createAndBindTexture(rasterWidth, rasterHeight, GL_RGBA));
+				image = new MinicraftImage(simulatedRasterScreen.getTexture(), rasterWidth, rasterHeight);
 				rasterX = menuBounds.getLeft() + MinicraftImage.boxWidth;
 				rasterY = menuBounds.getTop() + MinicraftImage.boxWidth;
 			}
@@ -504,7 +506,7 @@ public class QuestsDisplay extends Display {
 				super.render(screen);
 				for (Menu menu : menus)
 					menu.render(screen);
-				Arrays.fill(rasterPixels, Color.BLACK);
+
 				renderRaster();
 				// Border
 				screen.drawRect(rasterX - 1, rasterY - 1, rasterWidth + 2, rasterHeight + 2, Color.WHITE);
@@ -573,28 +575,32 @@ public class QuestsDisplay extends Display {
 						Font.draw(Localization.getLocalized(quest.key), simulatedRasterScreen, x + entryPadding, y + entryPadding,
 							selected ? (quest.isCompleted() ? Color.tint(Color.GREEN, 1, true) :
 								Color.WHITE) : Color.tint(Color.GRAY, 1, true));
-						for (int i = 0; i < rec.getWidth(); i++) { // Border.
+						simulatedRasterScreen.drawRect(x, y, rec.getWidth(), rec.getHeight(),
+							selected ? (quest.isCompleted() ? Color.tint(Color.GREEN, -1, true) :
+								Color.tint(Color.GRAY, 2, true)) : Color.GRAY);
+						/* for (int i = 0; i < rec.getWidth(); i++) { // Border.
 							for (int j = 0; j < rec.getHeight(); j++) {
 								if (i == 0 || i == rec.getWidth() - 1 || j == 0 || j == rec.getHeight() - 1)
 									renderRasterPixel(x + i, y + j,
 										selected ? (quest.isCompleted() ? Color.tint(Color.GREEN, -1, true) :
 											Color.tint(Color.GRAY, 2, true)) : Color.GRAY);
 							}
-						}
+						} */
 					}
 				}
 			}
 
-			private void renderRasterPixel(int x, int y, int color) {
+			/* private void renderRasterPixel(int x, int y, int color) {
 				x -= xScroll;
 				y -= yScroll;
 				if (x < 0 || x >= rasterWidth || y < 0 || y >= rasterHeight) return; // Out of bounds.
 				rasterPixels[x + y * rasterWidth] = color;
-			}
+			} */
 
 			// Parts of Bresenham's line algorithm
 			void plotLineLow(int x0, int y0, int x1, int y1, IntPredicate yRange, int color) {
-				int dx = x1 - x0;
+				simulatedRasterScreen.drawLine(x0, y0, x1, y1, color);
+				/* int dx = x1 - x0;
 				int dy = y1 - y0;
 				int yi = 1;
 				if (dy < 0) {
@@ -611,11 +617,12 @@ public class QuestsDisplay extends Display {
 						D = D + (2 * (dy - dx));
 					} else
 						D = D + 2 * dy;
-				}
+				} */
 			}
 
 			void plotLineHigh(int x0, int y0, int x1, int y1, IntPredicate yRange, int color) {
-				int dx = x1 - x0;
+				simulatedRasterScreen.drawLine(x0, y0, x1, y1, color);
+				/* int dx = x1 - x0;
 				int dy = y1 - y0;
 				int xi = 1;
 				if (dx < 0) {
@@ -632,7 +639,7 @@ public class QuestsDisplay extends Display {
 						D = D + (2 * (dx - dy));
 					} else
 						D = D + 2 * dx;
-				}
+				} */
 			}
 
 			void plotLine(int x0, int y0, int x1, int y1, IntPredicate yRange, int color) {

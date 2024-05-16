@@ -8,6 +8,7 @@ import com.studiohartman.jamepad.ControllerManager;
 import com.studiohartman.jamepad.ControllerUnpluggedException;
 import minicraft.util.Logging;
 import org.jetbrains.annotations.Nullable;
+import org.lwjgl.glfw.GLFW;
 import org.tinylog.Logger;
 
 import java.awt.Component;
@@ -67,16 +68,16 @@ public class InputHandler implements KeyListener {
 	private static HashMap<Integer, String> keyNames = new HashMap<>();
 
 	static {
-		Field[] keyEventFields = KeyEvent.class.getFields();
+		Field[] keyEventFields = GLFW.class.getFields();
 		ArrayList<Field> keyConstants = new ArrayList<>();
 		for (Field field : keyEventFields) {
-			if (field.getName().contains("VK_") && (field.getType().getName().equals(int.class.getName())))
+			if (field.getName().contains("GLFW_KEY_") && (field.getType().getName().equals(int.class.getName())))
 				keyConstants.add(field);
 		}
 
 		for (Field keyConst : keyConstants) {
 			String name = keyConst.getName();
-			name = name.substring(3); // Removes the "VK_"
+			name = name.substring(9); // Removes the "GLFW_KEY_"
 			try {
 				keyNames.put(((Integer) keyConst.get(0)), name);
 			} catch (IllegalAccessException ignored) {
@@ -84,8 +85,10 @@ public class InputHandler implements KeyListener {
 		}
 
 		// For compatibility becuase I'm lazy. :P
-		keyNames.put(KeyEvent.VK_BACK_SPACE, "BACKSPACE");
-		keyNames.put(KeyEvent.VK_CONTROL, "CTRL");
+// 		keyNames.put(KeyEvent.VK_BACK_SPACE, "BACKSPACE");
+		keyNames.put(GLFW.GLFW_KEY_LEFT_CONTROL, "CTRL");
+		keyNames.put(GLFW.GLFW_KEY_LEFT_SHIFT, "SHIFT");
+		keyNames.put(GLFW.GLFW_KEY_LEFT_ALT, "ALT");
 	}
 
 	private HashMap<String, String> keymap; // The symbolic map of actions to physical key names.
@@ -650,6 +653,17 @@ public class InputHandler implements KeyListener {
 	public void keyTyped(KeyEvent ke) {
 		// Stores the last character typed
 		keyTypedBuffer = String.valueOf(ke.getKeyChar());
+	}
+
+	public void glfwKeyCallback(long window, int key, int scancode, int action, int mods) {
+		toggle(key, action==GLFW.GLFW_PRESS || action == GLFW.GLFW_REPEAT);
+		// "charCallback" doesn't detect backspace and enter keys so handle them here
+		if(key == GLFW.GLFW_KEY_BACKSPACE && (action == GLFW.GLFW_PRESS || action == GLFW.GLFW_REPEAT))
+			keyTypedBuffer = "\b";
+	}
+
+	public void glfwCharCallback(long window, int key) {
+		keyTypedBuffer = String.valueOf(key);
 	}
 
 	private static final String control = "[\\p{Print}\n]+"; // Should match only printable characters.

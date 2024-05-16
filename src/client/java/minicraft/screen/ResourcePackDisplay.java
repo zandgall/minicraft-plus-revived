@@ -6,6 +6,7 @@ import minicraft.core.Renderer;
 import minicraft.core.io.FileHandler;
 import minicraft.core.io.InputHandler;
 import minicraft.core.io.Localization;
+import minicraft.core.io.Shader;
 import minicraft.core.io.Sound;
 import minicraft.gfx.Color;
 import minicraft.gfx.Font;
@@ -69,6 +70,9 @@ public class ResourcePackDisplay extends Display {
 	 * 		│	└──	<locale>.json
 	 * 		├──	sound
 	 * 		│	└──	<name>.wav
+	 *      ├── shaders
+	 *      │   ├── <name>.vs
+	 *      │   └── <name>.fs
 	 * 		└──	textures
 	 * 			├──	entity
 	 * 			│	└──	<entity_name>.png
@@ -735,6 +739,7 @@ public class ResourcePackDisplay extends Display {
 		Localization.resetLocalizations();
 		BookData.resetBooks();
 		Sound.resetSounds();
+		Shader.initShaders();
 		SpriteAnimation.resetMetadata();
 		for (ResourcePack pack : loadQuery) {
 			if (pack.openStream()) {
@@ -743,6 +748,7 @@ public class ResourcePackDisplay extends Display {
 					loadLocalization(pack);
 					loadBooks(pack);
 					loadSounds(pack);
+					loadShaders(pack);
 					pack.close();
 				} catch (IOException e) {
 					CrashHandler.errorHandle(e);
@@ -1002,6 +1008,65 @@ public class ResourcePackDisplay extends Display {
 				Sound.loadSound(name.substring(0, name.length() - 4), new BufferedInputStream(pack.getResourceAsStream(f)), pack.name);
 			} catch (IOException e) {
 				Logging.RESOURCEHANDLER_LOCALIZATION.debug(e, "Unable to load audio: {} in pack : {}", f, pack.name);
+			}
+		}
+	}
+
+	/**
+	 * Loading shaders from the pack
+	 * @param pack The pack to be loaded.
+	 */
+	private static void loadShaders(ResourcePack pack) {
+		for(String path : pack.getFiles("assets/shaders/", (path, isDir) ->
+			(path.toString().endsWith(".vs") || path.toString().endsWith(".fs")) && !isDir)) {
+			try {
+				String shaderProgram = readStringFromInputStream(pack.getResourceAsStream(path));
+				switch(path) {
+					case "assets/shaders/sprite.vs":
+						Shader.sprite.setVertexShader(shaderProgram);
+						break;
+					case "assets/shaders/sprite.fs":
+						Shader.sprite.setFragmentShader(shaderProgram);
+						break;
+					case "assets/shaders/overlay.vs":
+						Shader.overlay.setVertexShader(shaderProgram);
+						break;
+					case "assets/shaders/overlay.fs":
+						Shader.overlay.setFragmentShader(shaderProgram);
+						break;
+					case "assets/shaders/postprocess.vs":
+						Shader.postprocess.setVertexShader(shaderProgram);
+						break;
+					case "assets/shaders/postprocess.fs":
+						Shader.postprocess.setFragmentShader(shaderProgram);
+						break;
+					case "assets/shaders/lighting.vs":
+						Shader.lighting.setVertexShader(shaderProgram);
+						break;
+					case "assets/shaders/lighting.fs":
+						Shader.lighting.setFragmentShader(shaderProgram);
+						break;
+					case "assets/shaders/rect.vs":
+						Shader.rect.setVertexShader(shaderProgram);
+						break;
+					case "assets/shaders/rect.fs":
+						Shader.rect.setFragmentShader(shaderProgram);
+						break;
+					case "assets/shaders/line.vs":
+						Shader.line.setVertexShader(shaderProgram);
+						break;
+					case "assets/shaders/line.fs":
+						Shader.line.setFragmentShader(shaderProgram);
+						break;
+					case "assets/shaders/lineSpecial.vs":
+						Shader.lineSpecial.setVertexShader(shaderProgram);
+						break;
+					case "assets/shaders/lineSpecial.fs":
+						Shader.lineSpecial.setFragmentShader(shaderProgram);
+						break;
+				}
+			} catch (IOException | RuntimeException e) {
+				Logging.RESOURCEHANDLER_SHADER.debug(e, "Unable to load shader: {} in pack : {}", path, pack.name);
 			}
 		}
 	}

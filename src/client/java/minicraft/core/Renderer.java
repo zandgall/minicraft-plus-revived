@@ -72,6 +72,7 @@ import static org.lwjgl.opengl.GL11.GL_UNSIGNED_BYTE;
 import static org.lwjgl.opengl.GL11.GL_UNSIGNED_INT;
 import static org.lwjgl.opengl.GL11.glBindTexture;
 import static org.lwjgl.opengl.GL11.glClear;
+import static org.lwjgl.opengl.GL11.glClearColor;
 import static org.lwjgl.opengl.GL11.glDrawElements;
 import static org.lwjgl.opengl.GL11.glGetTexImage;
 import static org.lwjgl.opengl.GL11.glViewport;
@@ -156,8 +157,9 @@ public class Renderer extends Game {
 		screen.flush();
 
 		// Draw the image on the window.
-		glBindFramebuffer(GL_FRAMEBUFFER, 0);
+		GLHelper.clearDrawnFramebuffers();
 		glViewport(0, 0, WINDOW_SIZE.width, WINDOW_SIZE.height);
+		glClearColor(1, 0, 0, 1);
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 		// Calculate how much we need to scale the screen to fit the window without stretching
@@ -166,15 +168,7 @@ public class Renderer extends Game {
 		float scale = Math.min(stretchWidth, stretchHeight);
 
 		Shader.postprocess.use();
-		Shader.postprocess.setProjection(
-			new Matrix4f().ortho(0, WINDOW_SIZE.width, 0, WINDOW_SIZE.height, -1, 1)
-		);
-		Shader.postprocess.setTransform(
-			new Matrix4f().identity()
-				.translate(WINDOW_SIZE.width/2.f, WINDOW_SIZE.height/2.f,0)
-				.scale(Renderer.WIDTH*scale*0.5f, Renderer.HEIGHT*scale*0.5f, 1)
-		);
-		Shader.postprocess.setTransform(screen.getTexture());
+		Shader.postprocess.setTexture(screen.getTexture());
 		glBindVertexArray(vao);
 		glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
 

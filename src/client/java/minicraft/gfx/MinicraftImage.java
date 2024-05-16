@@ -4,9 +4,13 @@ import minicraft.gfx.SpriteLinker.LinkedSprite;
 import minicraft.util.Logging;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Range;
+import org.lwjgl.BufferUtils;
 
 import java.awt.image.BufferedImage;
+import java.nio.ByteBuffer;
 import java.util.Objects;
+
+import static com.badlogic.gdx.graphics.GL20.GL_RGBA;
 
 /**
  * Although we have SpriteLinker, we still need SpriteSheet for buffering.
@@ -19,7 +23,7 @@ public class MinicraftImage {
 	public static final int boxWidth = 8;
 
 	public final int width, height; // Width and height of the sprite sheet
-	public final int[] pixels; // Integer array of the image's pixels
+	public final int texture; // The OpenGL texture
 
 	/**
 	 * Initializes a {@code MinicraftImage} instance from the provided size.
@@ -34,7 +38,7 @@ public class MinicraftImage {
 
 		this.width = width;
 		this.height = height;
-		pixels = new int[width * height];
+		this.texture = GLHelper.createAndBindTexture(width, height, GL_RGBA);
 	}
 
 	/**
@@ -44,6 +48,18 @@ public class MinicraftImage {
 	 */
 	public MinicraftImage(@NotNull BufferedImage image) {
 		this(image, image.getWidth(), image.getHeight());
+	}
+
+	/**
+	 * Constructs a {@code MinicraftImage} with a pre-generated OpenGL Texture handle, and its associated width and height
+	 * @param texture an OpenGL texture handler
+	 * @param width the width of the texture
+	 * @param height the height of the texture
+	 */
+	public MinicraftImage(int texture, int width, int height) {
+		this.texture = texture;
+		this.width = width;
+		this.height = height;
 	}
 
 	/**
@@ -62,35 +78,37 @@ public class MinicraftImage {
 
 		this.width = width;
 		this.height = height;
-		pixels = image.getRGB(0, 0, width, height, null, 0, width); // Gets the color array of the image pixels
+		int[] pixels = image.getRGB(0, 0, width, height, null, 0, width); // Gets the color array of the image pixels
+		ByteBuffer buffer = BufferUtils.createByteBuffer(width*height*4);
 
 		// Applying the RGB array into Minicraft rendering system 25 bits RBG array.
 		for (int i = 0; i < pixels.length; i++) { // Loops through all the pixels
-			int red;
-			int green;
-			int blue;
-
-			// This should be a number from 0-255 that is the red of the pixel
-			red = (pixels[i] & 0xff0000);
-
-			// Same, but green
-			green = (pixels[i] & 0xff00);
-
-			// Same, but blue
-			blue = (pixels[i] & 0xff);
+			// An integer written in hex looks like 0xII II II II, where each two 'I' is a byte
+			// An integer can represent a color where TT=transparent, RR=red, GG=green, and BB=blue
+			// 0xTT RR GG BB
+			// In order to grab the transparency byte (TT), we need to move, or "shift" the integer over 24 bits, or 3 bytes
+			// 0xTT RR GG BB >> 24  =  0x00 00 00 TT
+			// Now we have an integer between 0 and 255 that holds the transparency value
 
 			// This stuff is to figure out if the pixel is transparent or not
 			int transparent = 1;
-
 			// A value of 0 means transparent, a value of 1 means opaque
 			if (pixels[i] >> 24 == 0x00) {
 				transparent = 0;
 			}
 
 			// Actually put the data in the array
-			// Uses 25 bits to store everything (8 for red, 8 for green, 8 for blue, and 1 for alpha)
-			pixels[i] = (transparent << 24) + red + green + blue;
+			// Grab the Red, Green, and Blue values from image pixels, and put them back in RGBA order
+			buffer.put((byte)((pixels[i]>>16)&0xFF));
+			buffer.put((byte)((pixels[i]>>8)&0xFF));
+			buffer.put((byte)((pixels[i])&0xFF));
+			buffer.put((byte)(transparent * 0xFF));
 		}
+
+		buffer.flip();
+
+		texture = GLHelper.createAndBindTexture(width, height, GL_RGBA);
+		GLHelper.bindTextureData(texture, width, height, GL_RGBA, buffer);
 	}
 
 	/**
