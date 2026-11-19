@@ -307,10 +307,10 @@ public class Load {
 
 			LoadingDisplay.setPercentage(0);
 			loadGame("Game"); // More of the version will be determined here
-			if(worldVer.compareTo(new Version("2.3.0-dev2")) < 0)
-				loadWorld("Level");
-			else
+			if ((worldVer.compareTo(new Version("2.3.0-dev2")) > 0))
 				loadWorldInf("Level");
+            else
+				loadWorld("Level");
 			loadPlayer("Player", Game.player);
 			loadEntities("Entities");
 			loadInventory("Inventory", Game.player.getInventory());

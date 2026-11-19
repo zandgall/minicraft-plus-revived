@@ -1,7 +1,5 @@
 package minicraft.level.biome;
 
-import java.util.Random; // TODO: Make single-instance tiles (stairs) into structures
-
 import minicraft.level.ChunkManager;
 import minicraft.level.noise.LevelNoise;
 import minicraft.level.tile.Tiles;

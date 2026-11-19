@@ -6,7 +6,7 @@ import minicraft.level.noise.LevelNoise;
 
 public class OceanBiome extends Biome {
 	public OceanBiome() {
-		super(0, -1f, 0.2f);
+		super(0, -1.5f, 0.2f);
 	}
 
 	public void generate(ChunkManager map, int x, int y) {

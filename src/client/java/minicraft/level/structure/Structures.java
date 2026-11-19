@@ -17,36 +17,36 @@ import java.util.HashSet;
 import java.util.Collections;
 
 public class Structures {
-	public static final SimpleStructure dungeonGate;
-	public static final SimpleStructure dungeonLock;
-	public static final SimpleStructure dungeonBossRoom;
-	public static final SimpleStructure lavaPool;
-	public static final SimpleStructure ornateLavaPool;
-	public static final SimpleStructure dungeonGarden;
-	public static final SimpleStructure dungeonChest;
-	public static final SimpleStructure dungeonSpawner;
+	public static SimpleStructure dungeonGate;
+	public static SimpleStructure dungeonLock;
+	public static SimpleStructure dungeonBossRoom;
+	public static SimpleStructure lavaPool;
+	public static SimpleStructure ornateLavaPool;
+	public static SimpleStructure dungeonGarden;
+	public static SimpleStructure dungeonChest;
+	public static SimpleStructure dungeonSpawner;
 
 	// All the "mobDungeon" structures are for the spawner structures
-	public static final SimpleStructure mobDungeonCenter;
-	public static final JigsawStructure mobDungeon;
-	public static final JigsawStructure complexMobDungeon;
+	public static SimpleStructure mobDungeonCenter;
+	public static JigsawStructure mobDungeon;
+	public static JigsawStructure complexMobDungeon;
 
-	public static final SimpleStructure airWizardHouse;
+	public static SimpleStructure airWizardHouse;
 
 	// Used for random villages
-	public static final ScatteredStructure village;
-	public static final ScatteredStructure ruinedVillage;
+	public static ScatteredStructure village;
+	public static ScatteredStructure ruinedVillage;
 
-	public static final Stairs skyStairsUp = new Stairs(true, 64);
-	public static final Stairs skyStairsDown = new Stairs(false, 64);
-	public static final Stairs surfaceStairsUp = new Stairs(true, 16);
-	public static final Stairs surfaceStairsDown = new Stairs(false, 16);
-	public static final Stairs stairsUp = new Stairs(true, 32);
-	public static final Stairs stairsDown = new Stairs(false, 32);
+	public static Stairs skyStairsUp = new Stairs(true, 64);
+	public static Stairs skyStairsDown = new Stairs(false, 64);
+	public static Stairs surfaceStairsUp = new Stairs(true, 16);
+	public static Stairs surfaceStairsDown = new Stairs(false, 16);
+	public static Stairs stairsUp = new Stairs(true, 32);
+	public static Stairs stairsDown = new Stairs(false, 32);
 
 	// Structures are oriented top->bottom for each line, & left->right for each character
 	// i.e. how it appears in code is how it appears in-game
-	static {
+	public static void initStructureList() {
 		// Deep dungeons
 		{
 			dungeonGate = new SimpleStructure(64);
@@ -219,8 +219,10 @@ public class Structures {
 
 		village = new ScatteredStructure(128, 16, 3, 6);
 		village.add(new VillageHouse(128, false), 3, 6);
-		ruinedVillage = new ScatteredStructure(128, 16, 3, 6);
-		ruinedVillage.add(new VillageHouse(128, true), 3, 6);
+		Structures.ruinedVillage = new ScatteredStructure(128, 16, 3, 6);
+		Structures.ruinedVillage.add(new VillageHouse(128, true), 3, 6);
+		System.out.println("Made ruined village!");
+		System.out.println(ruinedVillage);
 	}
 
 	private static void setupComplexMobDungeon() {

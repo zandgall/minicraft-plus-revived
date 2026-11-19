@@ -150,6 +150,23 @@ public class Level {
 		this(w, h, level, parentLevel, true);
 	}
 
+	/**
+	 * Empty level used for previewing
+	 */
+	public Level(int w, int h, long seed, int level) {
+		depth = level;
+		this.w = w;
+		this.h = h;
+		this.seed = seed;
+		this.parentLevel = parentLevel;
+		random = new Random(seed);
+		simplex = new Simplex(seed);
+
+		chunkGenerator = new ChunkGenerator(this);
+		chunkManager = new ChunkManager();
+	}
+
+
 	// Save data
 	public Entity[] getEntitiesToSave() {
 		Entity[] allEntities = new Entity[entities.size() + entitiesToAdd.size()];

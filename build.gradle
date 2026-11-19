@@ -74,6 +74,33 @@ project(":client") {
     }
 }
 
+project(":levelpreview") {
+	base {
+		archivesName = "minicraft-plus-levelpreview"
+	}
+
+	repositories {
+        maven { url "https://plugins.gradle.org/m2/" }
+        maven { url "https://jitpack.io" }
+	}
+
+	dependencies {
+        implementation project(":common")
+        implementation project(":client")
+
+        implementation 'org.json:json:20220320'
+        implementation 'com.konghq:unirest-java:3.13.10'
+        implementation 'com.badlogicgames.gdx:gdx:1.11.0'
+        implementation 'com.badlogicgames.gdx:gdx-box2d:1.11.0'
+        implementation 'com.badlogicgames.gdx:gdx-controllers:1.9.13'
+        implementation 'com.badlogicgames.jamepad:jamepad:2.0.20.0'
+    }
+
+    application {
+        mainClass = 'minicraft.level.LevelPreview'
+    }
+}
+
 project(":server") {
 
 	base {

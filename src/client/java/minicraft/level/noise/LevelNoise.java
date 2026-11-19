@@ -102,7 +102,7 @@ public class LevelNoise {
 	}
 
 	public double getHeight(int x, int y) {
-		return octave(x, y, layers - 2, 0.005, 0.01, 0.02, 0.01, 0.02, 0.05, 0.1, 0.2, 0.7, 0.2);
+		return octave(x, y, layers - 2, 0.005, 0.01, 0.02, 0.3, 0.02, 0.05, 0.1, 0.7, 0.2, 0.1);
 	}
 
 	public double getHumidity(int x, int y) {

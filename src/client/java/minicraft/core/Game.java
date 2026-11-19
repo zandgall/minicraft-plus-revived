@@ -7,6 +7,7 @@ import minicraft.entity.mob.Player;
 import minicraft.level.Level;
 import minicraft.level.tile.Tiles;
 import minicraft.level.biome.Biomes;
+import minicraft.level.structure.Structures;
 import minicraft.saveload.Load;
 import minicraft.saveload.Version;
 import minicraft.screen.Display;
@@ -109,6 +110,7 @@ public class Game {
 		ResourcePackDisplay.reloadResources();
 
 		Tiles.initTileList();
+		Structures.initStructureList();
 		Biomes.initBiomeList();
 
 		// Load the selected language.
